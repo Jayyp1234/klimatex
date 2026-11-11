@@ -1,0 +1,96 @@
+# Frontend-only deployment for team20: a stock nginx image serving the static export of web/.
+# The site itself arrives through the klimatex-site-* ConfigMaps created by deploy.sh, so no
+# image registry is needed. Applying backend-php/k8s/app.yaml later replaces this Deployment.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: klimatex-nginx
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+      index index.html;
+      absolute_redirect off;
+      error_page 404 /404.html;
+
+      location = /healthz {
+        default_type application/json;
+        return 200 '{"ok":true,"mode":"frontend-only"}';
+      }
+
+      # The PHP API isn't deployed here. The Verify dialog shows "can't be reached" for a 503.
+      location ^~ /api/ {
+        default_type application/json;
+        return 503 '{"detail":"API not deployed"}';
+      }
+      location ^~ /hooks/ {
+        default_type application/json;
+        return 503 '{"detail":"API not deployed"}';
+      }
+
+      location /_next/static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+      }
+      location / {
+        try_files $uri $uri.html $uri/ =404;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: app }
+  template:
+    metadata:
+      labels: { app: app }
+    spec:
+      initContainers:
+        - name: unpack-site
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          command: ["sh", "-c", "cat /chunks/part-* | tar xz -C /site"]
+          volumeMounts:
+            - { name: chunks, mountPath: /chunks, readOnly: true }
+            - { name: site, mountPath: /site }
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+      containers:
+        - name: app
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 5
+          volumeMounts:
+            - { name: site, mountPath: /usr/share/nginx/html, readOnly: true }
+            - { name: nginx, mountPath: /etc/nginx/conf.d, readOnly: true }
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+      volumes:
+        - name: site
+          emptyDir: {}
+        - name: nginx
+          configMap: { name: klimatex-nginx }
+        - name: chunks
+          projected:
+            sources:
+              - configMap: { name: klimatex-site-0, optional: true }
+              - configMap: { name: klimatex-site-1, optional: true }
+              - configMap: { name: klimatex-site-2, optional: true }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  selector: { app: app }
+  ports:
+    - port: 80
+      targetPort: 8080

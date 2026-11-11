@@ -1,0 +1,81 @@
+# The platform guide's reference manifest (section 4.2), adapted for the PHP image.
+# The gateway publishes exactly one Service per team: it must be named "app", port 80.
+# It appears at https://team20.xtradot.co with no DNS or ticket needed.
+#
+# Before applying, create the app's secret once (values are yours, never commit them):
+#   kubectl create secret generic klimatex-secrets \
+#     --from-literal=DB_DSN='pgsql:host=postgres;port=5432;dbname=klimatex' \
+#     --from-literal=DB_USER='klimatex' \
+#     --from-literal=DB_PASS='<strong-password>' \
+#     --from-literal=WEBHOOK_SECRET='pending' \
+#     --from-literal=JWT_SECRET="$(openssl rand -hex 32)" \
+#     --from-literal=DEMO_PASSWORD='<password for the demo logins>'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: app }
+  template:
+    metadata:
+      labels: { app: app }
+    spec:
+      # imagePullSecrets: [{ name: regcred }]   # only if the image is private
+      containers:
+        - name: app
+          image: ghcr.io/jayyp1234/klimatex-php:v5   # tag every release; never use :latest
+          ports:
+            - containerPort: 8080
+          env:
+            - { name: MODE, value: live }
+            - { name: PUBLIC_BASE_URL, value: "https://team20.xtradot.co" }
+            - { name: WEBHOOK_URL, value: "http://app.team20.svc.cluster.local/hooks/forge" }
+          envFrom:
+            - secretRef: { name: huawei-gateway, optional: true }   # provides GATEWAY_KEY
+            - secretRef: { name: klimatex-secrets }                 # DB_DSN, DB_USER, DB_PASS, WEBHOOK_SECRET, JWT_SECRET, DEMO_PASSWORD
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 5
+          # Sized so a rolling update (old + new app pod together) fits the team quota: 400m/768Mi requests, 2 cores/2Gi limits.
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+---
+# Finishes payouts, requeries pending transfers and expires reservations.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/jayyp1234/klimatex-php:v5   # keep in step with the app image
+          command: ["php", "scripts/worker.php"]
+          env:
+            - { name: MODE, value: live }
+            - { name: PUBLIC_BASE_URL, value: "https://team20.xtradot.co" }
+          envFrom:
+            - secretRef: { name: huawei-gateway, optional: true }
+            - secretRef: { name: klimatex-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  selector: { app: app }
+  ports:
+    - port: 80
+      targetPort: 8080

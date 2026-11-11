@@ -1,0 +1,50 @@
+# ── Secrets: never commit ──
+team*.yml
+team*.yaml
+*.kubeconfig
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
+*.p8
+*.p12
+
+# ── Dependencies ──
+node_modules/
+vendor/
+
+# ── Build output ──
+# The built website is copied here by `npm run publish:site` in web/. Only the entry point is source.
+backend-php/public/*
+!backend-php/public/index.php
+!backend-php/public/.gitkeep
+web/.next/
+web/out/
+*.tsbuildinfo
+mobile/ios/
+mobile/android/
+mobile/dist/
+mobile/.expo/
+
+# ── Large binaries: build them, or fetch from the repository's Releases ──
+*.apk
+*.aab
+*.ipa
+
+# ── Local databases and caches ──
+*.db
+*.sqlite
+.phpunit.cache/
+.phpunit.result.cache
+
+# ── Not ours to redistribute ──
+Forge_2026_Sandbox_Participant_Platform_Guide.pdf
+
+# ── Work in progress by another workstream (pitch deck from a template); add when it is finished ──
+pitch/
+
+# ── Local tooling ──
+.DS_Store

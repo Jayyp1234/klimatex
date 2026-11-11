@@ -1,0 +1,8 @@
+.git
+.env
+*.db
+vendor
+tests
+k8s
+team*.yaml
+.phpunit.result.cache

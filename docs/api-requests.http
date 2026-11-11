@@ -1,0 +1,113 @@
+### KlimateX API: every call, in the order of the demo.
+### Open in VS Code with the "REST Client" extension (or JetBrains HTTP client) and click "Send Request".
+### Switch @base to the live address after deploying.
+
+@base = http://localhost:8080
+# @base = https://team20.xtradot.co
+
+# Paste the access_token from a login below. Roles: admin, auditor, buyer, adaeze (household), installer, lender.
+@token = paste-access-token-here
+
+### Sign in (the password is DEMO_PASSWORD)
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "admin@demo.klimatex.test", "password": "your-demo-password" }
+
+### Health
+GET {{base}}/healthz
+
+### Can the pod reach the bank sandbox? (live only)
+GET {{base}}/api/sandbox/check
+Authorization: Bearer {{token}}
+
+### Register our webhook (live only; copy webhook_secret from the reply)
+POST {{base}}/api/sandbox/register-webhook
+Authorization: Bearer {{token}}
+
+### ── The whole story in one call ──
+POST {{base}}/api/demo/run
+Authorization: Bearer {{token}}
+
+### ── Or step by step ──
+
+### 1. Seed 20 Surulere homes, Jan to Jun 2026
+POST {{base}}/api/sim/seed
+Authorization: Bearer {{token}}
+
+### 2. Open a monitoring period
+POST {{base}}/api/periods
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "start": "2026-01-01", "end": "2026-06-30" }
+
+### 3. Compute tonnes and run the nine checks
+POST {{base}}/api/periods/1/compute
+Authorization: Bearer {{token}}
+
+### 4. See every home's result
+GET {{base}}/api/periods/1
+Authorization: Bearer {{token}}
+
+### 5. Draw the auditor's sample (visible seed)
+POST {{base}}/api/periods/1/sample?seed=42
+Authorization: Bearer {{token}}
+
+### 6. Review a sampled home (repeat for each id in the sample)
+POST {{base}}/api/periods/1/sites/3/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "decision": "ok", "note": "evidence consistent" }
+
+### 6b. Keep a clone-pair home held
+POST {{base}}/api/periods/1/sites/4/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "decision": "keep_held", "note": "clone pair, needs a site visit" }
+
+### 7. Sign off and mint credits
+POST {{base}}/api/periods/1/signoff
+Authorization: Bearer {{token}}
+
+### 8. Credits for sale
+GET {{base}}/api/credits?status=listed
+
+### 9. Buyer reserves 10 credits (open payment_url to pay with the test card)
+POST {{base}}/api/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tonnes": 10 }
+
+### 10. Confirm: verify payment, retire, split, pay (safe to call twice)
+POST {{base}}/api/orders/1/confirm
+Authorization: Bearer {{token}}
+
+### 11. The order, its certificate and every payout
+GET {{base}}/api/orders/1
+Authorization: Bearer {{token}}
+
+### ── Household app ──
+GET {{base}}/api/homes
+Authorization: Bearer {{token}}
+
+###
+GET {{base}}/api/homes/12
+Authorization: Bearer {{token}}
+
+###
+GET {{base}}/api/homes/12/certificate
+Authorization: Bearer {{token}}
+
+### Monthly message (lang: en, pcm, yo, ig, ha)
+GET {{base}}/api/homes/12/message?lang=pcm
+Authorization: Bearer {{token}}
+
+### ── Public verify page ──
+GET {{base}}/api/verify/KX-NG-2026-LAG01-000001
+
+###
+GET {{base}}/api/ledger/verify

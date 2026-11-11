@@ -1,0 +1,51 @@
+# Postgres in our own namespace.
+# Create the password secret first (never commit it):
+#   kubectl create secret generic klimatex-db --from-literal=POSTGRES_PASSWORD='<strong-password>'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - { name: POSTGRES_DB, value: klimatex }
+            - { name: POSTGRES_USER, value: klimatex }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: klimatex-db, key: POSTGRES_PASSWORD } }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "klimatex"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+      volumes:
+        # Temporary storage: data is lost if this pod restarts (re-run php scripts/demo.php).
+        # The platform cannot create volumes right now ("outstanding balance on your account").
+        # When it can, swap back to:  persistentVolumeClaim: { claimName: postgres-data }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432

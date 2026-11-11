@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "KlimateX",
+    "slug": "klimatex",
+    "scheme": "klimatex",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#eff5ee",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b3f2a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.xtradot.klimatex",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "co.xtradot.klimatex",
+      "adaptiveIcon": {
+        "backgroundColor": "#0b3f2a",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "KlimateX uses the microphone so you can ask questions by voice.",
+          "speechRecognitionPermission": "KlimateX turns your spoken question into text so it can answer you."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

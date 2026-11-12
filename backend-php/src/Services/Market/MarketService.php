@@ -302,10 +302,41 @@ final class MarketService
         $out = ['order' => $id, 'status' => $order['status'], 'certificate' => $order['registry_certificate_id'],
             'certificate_url' => $order['registry_certificate_url'], 'payment_status' => $order['payment_status'],
             'total_naira' => (int) $order['amount_kobo'] / 100, 'by_role_naira' => array_map(fn ($kobo) => $kobo / 100, $byRole)];
+        $out['money'] = self::reconcile($order, $byRole);
         if ($includePayouts) {
             $out['payouts'] = array_map(fn ($p) => ['role' => $p['role'], 'to' => $p['recipient'], 'naira' => (int) $p['amount_kobo'] / 100, 'status' => $p['status']], $payouts);
         }
         return $out;
+    }
+
+    /**
+     * Where the buyer's money went, in one balanced line: the registry keeps its fee and pays the rest to the
+     * project owner (KlimateX), and KlimateX pays families, the installer, the audit reserve and itself from it.
+     * The audit reserve carries the registry fee, so: received = families + installer + (audit - fee) + KlimateX.
+     */
+    public static function reconcile(array $order, array $byRoleKobo): ?array
+    {
+        $received = (int) ($order['registry_payout_kobo'] ?? 0);
+        if ($received === 0) {
+            return null;
+        }
+        $fee = (int) ($order['registry_fee_kobo'] ?? 0);
+        $families = $byRoleKobo['household'] ?? 0;
+        $installer = $byRoleKobo['installer'] ?? 0;
+        $auditNet = ($byRoleKobo['audit'] ?? 0) - $fee;
+        $klimatex = $byRoleKobo['klimatex'] ?? 0;
+        $paidOut = $families + $installer + $auditNet + $klimatex;
+        return [
+            'buyer_paid_naira' => (int) $order['amount_kobo'] / 100,
+            'registry_fee_naira' => $fee / 100,
+            'received_naira' => $received / 100,
+            'received_by' => (Settings::PROJECT_OWNER['payout_account'] === Settings::OPERATING_ACCOUNT ? 'KlimateX operating account' : Settings::PROJECT_OWNER['name'])
+                . ' · ' . Settings::PROJECT_OWNER['payout_account'],
+            'paid_out_naira' => ['families' => $families / 100, 'installer' => $installer / 100,
+                'audit_reserve_after_registry_fee' => $auditNet / 100, 'klimatex' => $klimatex / 100],
+            'balanced' => $paidOut === $received,
+            'difference_naira' => ($received - $paidOut) / 100,
+        ];
     }
 
     /** Paid in full: the bank says successful AND at least the order amount arrived (partial payments stay pending). */

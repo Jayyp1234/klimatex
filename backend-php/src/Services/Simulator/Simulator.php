@@ -38,13 +38,23 @@ final class Simulator
         return $out;
     }
 
+    /**
+     * Bank references for wallets and the loan are fixed per home. When the live database is reset and
+     * seeded again, SEED_RUN (e.g. a timestamp) makes them new, so the sandbox can't refuse or replay them.
+     */
+    private static function runTag(): string
+    {
+        $run = preg_replace('/[^A-Za-z0-9]/', '', (string) getenv('SEED_RUN'));
+        return $run !== '' ? "-$run" : '';
+    }
+
     /** A real sandbox loan. If the bank refuses, the home is simply paid into its wallet. */
     private static function openLoan(BankApi $bank, int $n): ?string
     {
         try {
             // Adaeze's own sandbox account and BVN, so the bank's scoring and disbursement are real.
             return $bank->openLoan(Settings::LOAN_APPLICANT_ACCOUNT, Settings::LOAN_APPLICANT_BVN, Settings::DEMO_LOAN_KOBO,
-                'Solar home system with 2.4 kWh battery', sprintf('loan_demo_%02d', $n));
+                'Solar home system with 2.4 kWh battery', sprintf('loan_demo_%02d', $n) . self::runTag());
         } catch (BankError $e) {
             error_log("demo loan for home $n: {$e->getMessage()}");
             return null;
@@ -92,7 +102,7 @@ final class Simulator
                 $label = sprintf('Home %02d', $n);
                 $name = $n === 12 ? 'Adaeze' : sprintf('Household %02d', $n);
                 $phone = sprintf('+23470000100%02d', $n);
-                $hh = Database::insert('households', ['name' => $name, 'phone' => $phone, 'wallet_id' => $b->createWallet($name, $phone, "hh-$n"),
+                $hh = Database::insert('households', ['name' => $name, 'phone' => $phone, 'wallet_id' => $b->createWallet($name, $phone, "hh-$n" . self::runTag()),
                     'consent_hash' => hash('sha256', "consent-$n"), 'loan_id' => $n === 12 ? self::openLoan($b, $n) : null]);
                 if ($n === 12) $adaeze = $hh;
                 $lat = 6.4980 + $rng->uniform(-0.01, 0.01);

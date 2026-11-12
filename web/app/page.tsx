@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BarChart3, ChevronRight, CircleDollarSign, Coins, Download, Layers, PlayCircle, ShieldCheck, Smartphone, Sun, Zap } from "lucide-react";
 import { Audience } from "@/components/Audience";
+import { DashboardShowcase } from "@/components/DashboardShowcase";
+import { PhoneShowcase } from "@/components/PhoneShowcase";
 import { Co2Text } from "@/components/Co2Text";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VerifyButton, VerifyDialog } from "@/components/VerifyCredit";
@@ -92,11 +94,13 @@ export default function HomePage() {
                 <VerifyButton className="rounded-lg border border-line bg-white px-6 py-3.5 text-[15px] font-medium shadow-sm transition-colors hover:bg-mint">
                   Verify a credit
                 </VerifyButton>
-                <a href="#get-the-app" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-6 py-3.5 text-[15px] font-medium shadow-sm transition-colors hover:bg-mint">
-                  <Smartphone size={17} className="text-leaf" /> Android app
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-medium">
+                <a href="#demo" className="inline-flex items-center gap-1.5 text-forest hover:underline">
+                  <PlayCircle size={16} className="text-leaf" /> Watch the 80-second demo
                 </a>
-                <a href="#demo" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-6 py-3.5 text-[15px] font-medium shadow-sm transition-colors hover:bg-mint">
-                  <PlayCircle size={17} className="text-leaf" /> Watch the demo
+                <a href="#get-the-app" className="inline-flex items-center gap-1.5 text-forest hover:underline">
+                  <Smartphone size={16} className="text-leaf" /> Get the Android app
                 </a>
               </div>
               <div className="mt-8 flex items-center gap-5">
@@ -168,6 +172,16 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section id="dashboards" aria-labelledby="dashboards-title" className="scroll-mt-20 border-t border-line bg-[#f6f9f5] py-12 lg:py-16">
+          <div className="mx-auto max-w-[1160px] px-4 sm:px-6">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-leaf">The platform</p>
+            <h2 id="dashboards-title" className="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">A dashboard for everyone in the chain</h2>
+            <div className="mt-6">
+              <DashboardShowcase />
+            </div>
+          </div>
+        </section>
+
         <section id="demo" aria-labelledby="demo-title" className="scroll-mt-20 border-t border-line py-12 lg:py-14">
           <div className="mx-auto max-w-[1160px] px-4 sm:px-6">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-leaf">Demo</p>
@@ -191,8 +205,8 @@ export default function HomePage() {
 
         <Audience />
 
-        <section id="get-the-app" aria-labelledby="get-the-app-title" className="scroll-mt-20 border-t border-line">
-          <div className="mx-auto grid max-w-[1160px] items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.2fr_1fr]">
+        <section id="get-the-app" aria-labelledby="get-the-app-title" className="scroll-mt-20 overflow-hidden border-t border-line bg-gradient-to-b from-white to-[#f3f8ef]">
+          <div className="mx-auto grid max-w-[1160px] items-center gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.1fr_1fr] lg:py-16">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-leaf">For families</p>
               <h2 id="get-the-app-title" className="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.03em] sm:text-[36px]">The KlimateX app for Android</h2>
@@ -209,12 +223,13 @@ export default function HomePage() {
               </div>
               <p className="mt-3 text-[13px] text-body">Needs {androidApp.requires}. Android will ask you to allow installs from your browser, because the app comes from this site and not the Play Store.</p>
               {androidApp.sha256 && <p className="mt-2 break-all font-mono text-[11.5px] text-muted">SHA-256 {androidApp.sha256}</p>}
+              <ol className="mt-5 space-y-2 rounded-2xl border border-line bg-white p-4 text-[13.5px] text-body">
+                <li><strong className="text-ink">1.</strong> Open this page on your Android phone and tap Download the APK.</li>
+                <li><strong className="text-ink">2.</strong> Open the file. If Android asks, allow installs from your browser for this one app.</li>
+                <li><strong className="text-ink">3.</strong> Sign in with your phone number. This is a sandbox build with demonstration data.</li>
+              </ol>
             </div>
-            <ol className="space-y-3 rounded-2xl border border-line bg-white p-5 text-[14px] text-body">
-              <li><strong className="text-ink">1.</strong> Open this page on your Android phone and tap Download the APK.</li>
-              <li><strong className="text-ink">2.</strong> Open the file. If Android asks, allow installs from your browser for this one app.</li>
-              <li><strong className="text-ink">3.</strong> Sign in with your phone number. This is a sandbox build with demonstration data.</li>
-            </ol>
+            <PhoneShowcase />
           </div>
         </section>
 

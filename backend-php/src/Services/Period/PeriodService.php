@@ -221,8 +221,10 @@ final class PeriodService
 
         // The registry is the issuer: it converts the metered kWh itself, and only its credits can be retired.
         // Its calls are idempotent by reference, so they run outside the database transaction.
-        $projectId = KvStore::get('registry_project') ?? Registry::createProject('proj-' . Settings::PROJECT_CODE);
-        KvStore::set('registry_project', $projectId);
+        // One registry project per owner: changing who is paid must register a new project, never reuse the old one.
+        $owner = Settings::PROJECT_OWNER['payout_account'];
+        $projectId = KvStore::get("registry_project:$owner") ?? Registry::createProject('proj-' . Settings::PROJECT_CODE . '-' . $owner);
+        KvStore::set("registry_project:$owner", $projectId);
         $mrvId = Registry::submitMrv($projectId, $period['start_day'], $period['end_day'], $kwh,
             Settings::publicBase() . '/api/ledger/verify', $this->sites->inverterSerials($eligibleSites), "mrv-$id")['submission_id'];
         Registry::verifyMrv($mrvId, "review-$id");

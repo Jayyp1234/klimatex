@@ -9,6 +9,7 @@ use App\Controllers\HomeController;
 use App\Controllers\MarketController;
 use App\Controllers\PublicController;
 use App\Controllers\StreetController;
+use App\Controllers\TelegramController;
 use App\Controllers\TipsController;
 use App\Controllers\SupportController;
 use App\Controllers\SystemController;
@@ -49,6 +50,10 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/api/homes/{id:\d+}/evidence', [TipsController::class, 'evidence', $staffAndOwner]);
     $r->addRoute('POST', '/api/homes/{id:\d+}/meter', [TipsController::class, 'recordMeter', ['installer', 'admin']]);
     $r->addRoute('POST', '/api/homes/mine/fuel-receipts', [TipsController::class, 'addReceipt', ['household']]);
+    $r->addRoute('GET', '/api/telegram', [TelegramController::class, 'status', ['household']]);
+    $r->addRoute('POST', '/api/telegram/link', [TelegramController::class, 'link', ['household']]);
+    $r->addRoute('DELETE', '/api/telegram/link', [TelegramController::class, 'unlink', ['household']]);
+    $r->addRoute('POST', '/api/telegram/webhook', [TelegramController::class, 'webhook', null]);
     $r->addRoute('GET', '/api/tips', [TipsController::class, 'fleet', ['installer', 'admin']]);
     $r->addRoute('GET', '/api/fleet', [FleetController::class, 'overview', ['installer', 'lender', 'admin']]);
     $r->addRoute('GET', '/api/homes/mine', [HomeController::class, 'mine', ['household']]);

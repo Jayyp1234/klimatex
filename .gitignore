@@ -47,4 +47,5 @@ Forge_2026_Sandbox_Participant_Platform_Guide.pdf
 pitch/
 
 # ── Local tooling ──
+.claude/
 .DS_Store

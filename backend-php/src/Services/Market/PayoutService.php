@@ -13,6 +13,7 @@ use App\Services\Bank\Bank;
 use App\Services\Bank\BankApi;
 use App\Services\Bank\BankError;
 use App\Services\Ledger\Ledger;
+use App\Services\Telegram\TelegramService;
 
 /**
  * Pays out a retired order. The rules that keep money safe:
@@ -67,6 +68,9 @@ final class PayoutService
         }
         $this->payouts->update((int) $payout['id'], ['status' => $status]);
         Ledger::append('payout', ['order' => (int) $payout['order_id'], 'role' => $payout['role'], 'amount_kobo' => (int) $payout['amount_kobo'], 'status' => $status, 'ref' => $reference]);
+        if ($status === 'paid' && $payout['role'] === 'household' && $payout['site_id']) {
+            TelegramService::notifyPayout((int) $payout['site_id'], (int) $payout['amount_kobo'], 'bank');
+        }
         if ($status === 'reversed') {
             $this->orders->transition((int) $payout['order_id'], 'settled', 'retired');
         }
@@ -129,6 +133,9 @@ final class PayoutService
             [$status, $response, $payout] = $this->sendToAccount($payout, (string) $home['payout_bank_code'], (string) $home['payout_account'],
                 $kobo, "KlimateX carbon payout, order $orderId", $bank);
             $this->saveResult($payout, $previous, $status, $response, ['site' => $siteId, 'recipient' => $label]);
+            if ($status === 'paid' && $previous !== 'paid') {
+                TelegramService::notifyPayout($siteId, $kobo, 'bank');
+            }
             return;
         }
         $payout = $this->prepareAttempt($payout);
@@ -144,6 +151,9 @@ final class PayoutService
             [$status, $response] = [$e->outcomeUnknown() ? 'pending' : 'failed', ['error' => $e->getMessage()]];
         }
         $this->saveResult($payout, $previous, $status, $response, $fields + ['site' => $siteId]);
+        if ($status === 'paid' && $previous !== 'paid') {
+            TelegramService::notifyPayout($siteId, $kobo, isset($fields['recipient']) ? 'loan' : 'wallet');
+        }
     }
 
     /** The family has already been paid into its wallet, so a failed loan repayment doesn't fail the payout. */

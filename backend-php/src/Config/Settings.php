@@ -19,6 +19,18 @@ final class Settings
     public static function maasBase(): string { return Env::get('MAAS_BASE_URL', 'http://huawei-maas.ingress-apisix.svc.cluster.local/openai/v1'); }
     public static function maasModel(): string { return Env::get('MAAS_MODEL', 'glm-5.2'); }
 
+    /** Claude: used for the assistant and family messages when a key is set (kept in a cluster secret only). */
+    public static function anthropicKey(): string { return Env::get('ANTHROPIC_API_KEY', ''); }
+    public static function anthropicModel(): string { return Env::get('ANTHROPIC_MODEL', 'claude-opus-5-5'); }
+    public static function anthropicBaseUrl(): ?string { return Env::get('ANTHROPIC_BASE_URL'); }
+
+    /** Telegram bot token from @BotFather. Empty: the bot is off. */
+    public static function telegramToken(): string { return Env::get('TELEGRAM_BOT_TOKEN', ''); }
+    /** The bot's username, for t.me links. Read from Telegram by scripts/telegram.php, or set here. */
+    public static function telegramBot(): string { return Env::get('TELEGRAM_BOT_USERNAME', ''); }
+    /** whisper.cpp server for Telegram voice notes; empty switches voice notes off. */
+    public static function whisperUrl(): string { return Env::get('WHISPER_URL', ''); }
+
     /** Crediting methodology code; see Carbon::ALL. */
     public static function methodology(): string { return Env::get('METHODOLOGY', 'gs-just-v1'); }
 
@@ -102,8 +114,11 @@ final class Settings
     // retires and pays the project owner, and KlimateX pays the family split from its operating account.
     public const REGISTRY_MERCHANT = 'mer_900';
     public const PROJECT_LOCATION = ['state' => 'Lagos', 'lga' => 'Surulere', 'lat' => 6.498, 'lng' => 3.355];
-    public const PROJECT_OWNER = ['name' => 'Arewa Solar Co-operative Society', 'contact_name' => 'KlimateX field operations',
-        'phone' => '+2348031234508', 'payout_account' => '0123987005', 'bank_code' => '000015'];
+    // KlimateX owns the project, so the registry pays sale proceeds (less its 2% fee) into the operating
+    // account that then pays families, the installer and the audit reserve. The books close on every order.
+    // 'name' is the operating account's holder name at the sandbox bank (intra name enquiry), as the registry checks it.
+    public const PROJECT_OWNER = ['name' => 'BABATUNDE OLUMIDE ADEYEMI', 'contact_name' => 'KlimateX operations',
+        'phone' => '+2348031234508', 'payout_account' => self::OPERATING_ACCOUNT, 'bank_code' => '000014'];
     public const DEMO_LOAN_KOBO = 50000000; // ₦500,000: above ₦1,000,000 the sandbox refers instead of approving
     public const MAX_ORDER_TONNES = 1000;
     public const MAX_PAYOUT_ATTEMPTS = 5;

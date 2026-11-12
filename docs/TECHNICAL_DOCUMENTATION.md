@@ -52,7 +52,7 @@ It was built for the Access Youth Tech Forge 2026 hackathon (team20). **All home
                 │               │
         Postgres (live)   Access sandbox, inside the cluster
         SQLite (laptop)   · bank API (wallets, transfers, loans, registry)
-                          · Huawei MaaS (LLM)
+                          · Huawei MaaS (LLM)        · optional: Claude API
 ```
 
 Three things to hold on to:
@@ -87,7 +87,7 @@ Not in the repository, on purpose: the team20 kubeconfig, any `.env`, `node_modu
 
 | Part | Stack |
 |---|---|
-| Backend | PHP 8.3, Apache, `nikic/fast-route`, `firebase/php-jwt`, `guzzlehttp/guzzle`, `vlucas/phpdotenv`, PHPUnit 11 |
+| Backend | PHP 8.3, Apache, `nikic/fast-route`, `firebase/php-jwt`, `guzzlehttp/guzzle`, `vlucas/phpdotenv`, `anthropic-ai/sdk`, PHPUnit 11 |
 | Database | PostgreSQL in the cluster, SQLite on a laptop (same migrations) |
 | Web | Next.js 16.4 (static export, `trailingSlash: true`), React 19.3, Tailwind CSS 4, `lucide-react`, TypeScript 5 |
 | Mobile | Expo SDK 58, React Native 0.88, React 19.3, Expo Router, TypeScript 6, `expo-secure-store`, `expo-speech`, `expo-speech-recognition`, `react-native-svg` |
@@ -238,6 +238,8 @@ Read in `Config/Settings.php` through `Env::get`. On a laptop they come from `ba
 | `WEBHOOK_SECRET` | none | Secret. Returned once by `register-webhook`. |
 | `BANK_BASE_URL` | in-cluster bank API | |
 | `MAAS_BASE_URL`, `MAAS_MODEL` | in-cluster Huawei MaaS, `glm-5.2` | OpenAI-style chat completions |
+| `ANTHROPIC_API_KEY` | none | Secret, optional. When set, the AI uses Claude. |
+| `ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL` | `claude-opus-5-5`, SDK default | |
 | `METHODOLOGY` | `gs-just-v1` | Which `Methodology` implementation computes credits |
 | `PUBLIC_BASE_URL` | `https://team20.xtradot.co` | Used in links and QR codes |
 | `WEBHOOK_URL` | in-cluster service URL | Where the sandbox calls back |
@@ -259,7 +261,7 @@ Two features use a language model. In both, the model only **writes**; it never 
 **Ask KlimateX** (`POST /api/assistant/ask`, `Services/Ai/Assistant.php`):
 
 - The model is given tools that read the signed-in home's records: `home_overview`, `audit_status`, `payouts`, `alerts`, `energy`, `credit_tips`, `loan` (`AssistantTools.php`). It cannot write anything.
-- Provider order: **Huawei MaaS** in live mode, otherwise **guided answers** (`GuidedAnswers.php`): fixed answers built from the same tools.
+- Provider order: **Claude** if `ANTHROPIC_API_KEY` is set, otherwise **Huawei MaaS** in live mode, otherwise **guided answers** (`GuidedAnswers.php`): fixed answers built from the same tools.
 - If the model call fails for any reason, it falls back to guided answers. The reply says which happened: `mode` is `model` or `guided`, and `sources` lists the tools used.
 - Questions are limited to 500 characters and throttled per user, because every question can cost several model calls out of the shared 60 a minute. The question text is never logged.
 - Languages: English, Pidgin, Yorùbá, Igbo, Hausa (`lang` = `en`, `pcm`, `yo`, `ig`, `ha`).
@@ -487,7 +489,7 @@ Development builds have a check under More › Language & preferences › Develo
 | `MODE` | `mock` | `live` |
 | Database | SQLite | Postgres in the cluster |
 | Bank, registry | `MockBank` | Access sandbox |
-| AI | Guided answers | Huawei MaaS |
+| AI | Guided answers | Claude if a key is set, else Huawei MaaS |
 
 Live runs in the Kubernetes namespace `team20`. You need the team20 kubeconfig (ask the team lead; it is never committed), `kubectl` 1.30+ and Docker.
 

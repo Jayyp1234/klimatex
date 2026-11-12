@@ -21,6 +21,19 @@ final class Maas
                                          ?string $reason, string $lang = 'en'): array
     {
         $template = ['text' => MessageTemplates::familyMessage($name, $grade, $litres, $t, $status, $reason, $lang), 'source' => 'template'];
+        if (Claude::configured()) {
+            try {
+                $facts = sprintf('Name: %s. Home grade: %s. Petrol avoided this month: %d litres. CO2 avoided: %.2f tonnes. Status: %s.%s',
+                    $name, $grade, round($litres), $t, $status, $reason ? " Reason held: $reason." : '');
+                $text = (new Claude())->write('You write short, warm SMS messages for solar households in Lagos, Nigeria. Use only the facts given. '
+                    . 'Never promise amounts or dates. Reply with the message text only, under 300 characters.',
+                    'Write this month\'s message in ' . (self::LANGS[$lang] ?? 'plain English') . ". Facts: $facts");
+                return ['text' => $text, 'source' => 'model'];
+            } catch (Throwable $e) {
+                error_log('claude: family message falls back to template: ' . get_class($e));
+                return $template;
+            }
+        }
         if (!Settings::live()) {
             return $template;
         }

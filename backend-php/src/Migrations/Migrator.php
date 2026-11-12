@@ -16,6 +16,7 @@ final class Migrator
         M006_SupportRequests::class,
         M007_Streets::class,
         M008_Evidence::class,
+        M009_Telegram::class,
     ];
 
     /** @return string[] names applied by this run */

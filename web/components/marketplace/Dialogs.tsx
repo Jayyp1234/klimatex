@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, LoaderCircle, Minus, Plus, X } from "lucide-react";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { Co2Text } from "@/components/Co2Text";
 import { RESERVATION_MINUTES, formatDate, formatNaira, type Credit, type Order, type Project } from "@/lib/marketplace";
 
@@ -179,8 +179,50 @@ export function CertificateDialog({ order, buyerName, onClose }: { order: Order;
         <Row label="KlimateX serials" value={<span className="font-mono text-[12px]">{order.serials[0]}{order.serials.length > 1 ? ` to ${order.serials[order.serials.length - 1].slice(-6)}` : ""}</span>} />
         <Row label="Retired on" value={formatDate(order.retiredOn)} />
       </dl>
+      <MoneyTrail orderId={order.id} />
       <p className="mt-3 text-xs text-muted">Held by the Forge sandbox carbon registry. Look up any KlimateX serial on the public verify page.</p>
     </Modal>
+  );
+}
+
+type Money = {
+  buyer_paid_naira: number;
+  registry_fee_naira: number;
+  received_naira: number;
+  received_by: string;
+  paid_out_naira: { families: number; installer: number; audit_reserve_after_registry_fee: number; klimatex: number };
+  balanced: boolean;
+  difference_naira: number;
+};
+
+/** Every naira of this purchase: what the registry kept, what KlimateX received, and who KlimateX paid. */
+function MoneyTrail({ orderId }: { orderId: number }) {
+  const [money, setMoney] = useState<Money | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<{ money: Money | null }>(`/api/orders/${orderId}`).then((o) => live && setMoney(o.money)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [orderId]);
+  if (!money) return null;
+  const out = money.paid_out_naira;
+  return (
+    <div className="mt-5 rounded-xl border border-line p-4">
+      <p className="text-sm font-semibold">Where your money went</p>
+      <dl className="mt-2 text-[13px]">
+        <Row label="You paid (Access checkout)" value={formatNaira(money.buyer_paid_naira)} />
+        <Row label="Carbon registry fee (2%)" value={`− ${formatNaira(money.registry_fee_naira)}`} />
+        <Row label="Received by KlimateX" value={<strong>{formatNaira(money.received_naira)}</strong>} />
+        <Row label="→ Families (50%)" value={formatNaira(out.families)} />
+        <Row label="→ Installer (15%)" value={formatNaira(out.installer)} />
+        <Row label="→ Audit reserve, after registry fee" value={formatNaira(out.audit_reserve_after_registry_fee)} />
+        <Row label="→ KlimateX platform fee (15%)" value={formatNaira(out.klimatex)} />
+      </dl>
+      <p className={`mt-2 flex items-center gap-1.5 text-[13px] font-medium ${money.balanced ? "text-leaf" : "text-red-700"}`}>
+        <CheckCircle2 size={16} /> {money.balanced ? "Balanced: every naira received is paid out" : `Off by ${formatNaira(money.difference_naira)}`}
+      </p>
+    </div>
   );
 }
 

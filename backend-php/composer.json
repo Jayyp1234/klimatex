@@ -23,6 +23,8 @@
         "php": "^8.3",
         "ext-curl": "*",
         "ext-pdo": "*",
+        "anthropic-ai/sdk": "^1.7",
+        "bacon/bacon-qr-code": "^3.0",
         "firebase/php-jwt": "^7.0",
         "guzzlehttp/guzzle": "^8.3",
         "nikic/fast-route": "^1.3",

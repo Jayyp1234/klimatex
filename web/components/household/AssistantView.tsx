@@ -9,6 +9,7 @@ import { LANGUAGES } from "@/lib/household";
 import { useHousehold } from "./HouseholdShell";
 import { selectClass } from "./ui";
 import { plainText, RichText } from "./RichText";
+import { TelegramConnect } from "./TelegramConnect";
 
 type Message = Turn & { reply?: AssistantReply; error?: boolean };
 
@@ -250,6 +251,8 @@ export function AssistantView() {
           </p>
         </form>
       </section>
+
+      <TelegramConnect />
     </div>
   );
 }

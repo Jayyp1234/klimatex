@@ -15,7 +15,7 @@ use Throwable;
 /**
  * The family assistant: answers questions about one home from that home's own records.
  *
- * With a model (Huawei MaaS in live mode), it lets the model choose
+ * With a model (Claude when ANTHROPIC_API_KEY is set, otherwise Huawei MaaS), it lets the model choose
  * read-only tools and write the answer.
  * Without one (laptop, or the model is down), GuidedAnswers replies from the same tools.
  * Either way it only explains: it can't move money, change details or approve anything.
@@ -31,7 +31,7 @@ final class Assistant
     private const WINDOW_SECONDS = 600;
 
     /** @param Closure(array $messages, array $tools): array|null $model returns the model's reply message */
-    public function __construct(private ?Closure $model = null, private SiteRepository $sites = new SiteRepository())
+    public function __construct(private ?Closure $model = null, private SiteRepository $sites = new SiteRepository(), private ?Claude $claude = null)
     {
     }
 
@@ -51,9 +51,11 @@ final class Assistant
 
         $tools = new AssistantTools($siteId);
         $history = self::history($input['history'] ?? []);
-        // Huawei MaaS in live mode, else guided answers.
+        // Claude when a key is configured, else Huawei MaaS in live mode, else guided answers.
         $attempt = match (true) {
             $this->model !== null => fn () => $this->withModel($this->model, $tools, $message, $history, $lang),
+            $this->claude !== null || Claude::configured() => fn () => ($this->claude ?? new Claude())->converse(self::rules($lang), [...$history, ['role' => 'user', 'content' => $message]],
+                array_map(fn ($t) => $t['function'], AssistantTools::definitions()), fn (string $name) => $tools->run($name)),
             Settings::live() => fn () => $this->withModel(self::maas(...), $tools, $message, $history, $lang),
             default => null,
         };

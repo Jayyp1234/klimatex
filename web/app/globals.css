@@ -34,3 +34,25 @@ dialog::backdrop {
     scroll-behavior: auto;
   }
 }
+
+/* Landing-page showcase: phones drift gently; nothing moves for people who ask for less motion. */
+@keyframes kx-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes kx-float-tilt {
+  0%, 100% { transform: translateY(0) rotate(var(--kx-tilt, -8deg)); }
+  50% { transform: translateY(-14px) rotate(var(--kx-tilt, -8deg)); }
+}
+@keyframes kx-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.kx-float { animation: kx-float 6s ease-in-out infinite; }
+.kx-float-tilt { animation: kx-float-tilt 7s ease-in-out infinite; }
+.kx-progress { transform-origin: left; animation: kx-progress var(--kx-duration, 4s) linear forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-float, .kx-float-tilt, .kx-progress { animation: none; }
+  .kx-float-tilt { transform: rotate(var(--kx-tilt, -8deg)); }
+}

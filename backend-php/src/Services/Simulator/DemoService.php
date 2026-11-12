@@ -23,7 +23,8 @@ final class DemoService
     ) {
     }
 
-    public function run(): array
+    /** The whole story; with $sell false it stops after sign-off, leaving the credits listed for a live sale. */
+    public function run(bool $sell = true): array
     {
         $steps = ['seed' => Simulator::seed()];
         $id = $this->periods->create(Simulator::START, Simulator::END);
@@ -36,14 +37,20 @@ final class DemoService
             $this->periods->review($id, $site, $held ? 'keep_held' : 'ok', $held ? 'clone pair, needs a site visit' : 'evidence consistent');
         }
         $steps['signoff'] = $this->periods->signOff($id, self::AUDITOR);
+        if (!$sell) {
+            return $steps + ['ledger' => Ledger::verify()];
+        }
+        return $steps + $this->sell();
+    }
+
+    /** A buyer buys the listed credits (up to 10) and pays with the test card, so every payout runs. */
+    public function sell(): array
+    {
         $buyer = $this->users->findByEmail('buyer@demo.klimatex.test');
         // Sell up to 10, but never more than the registry issued for this period.
         $tonnes = min(10, count((new CreditRepository())->serialsByStatus('listed')));
         $order = $this->market->createOrder(self::BUYER, $tonnes, $buyer ? (int) $buyer['id'] : null);
-        $steps['order'] = $order;
         Bank::client()->payWithTestCard($order['reference']);
-        $steps['settled'] = $this->market->confirm($order['order']);
-        $steps['ledger'] = Ledger::verify();
-        return $steps;
+        return ['order' => $order, 'settled' => $this->market->confirm($order['order']), 'ledger' => Ledger::verify()];
     }
 }

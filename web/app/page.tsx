@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BarChart3, ChevronRight, CircleDollarSign, Coins, Download, Layers, MessageCircle, PlayCircle, ShieldCheck, Smartphone, Sun, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, Coins, Download, Layers, MessageCircle, PlayCircle, ShieldCheck, Smartphone } from "lucide-react";
 import { Audience } from "@/components/Audience";
+import { HeroCertificate } from "@/components/HeroCertificate";
 import { ChatChannels } from "@/components/ChatChannels";
 import { DashboardShowcase } from "@/components/DashboardShowcase";
 import { PhoneShowcase } from "@/components/PhoneShowcase";
@@ -30,40 +31,6 @@ const stats = [
   { value: "~210 tCO₂e", label: "Pilot credit target (audit-ready)" },
   { value: "50 / 15 / 20 / 15", label: "Family / Installer / Audit & Registry / KlimateX (illustrative split)" },
 ];
-
-const certificate = [
-  { label: "Solar delivered", value: "2,006 kWh", icon: Sun },
-  { label: "Generator power avoided", value: "1,504 kWh", icon: Zap },
-  { label: "Credits (est.)", value: "2.1 tCO₂e", icon: CircleDollarSign },
-];
-
-function Certificate() {
-  return (
-    <div className="w-full max-w-[290px] rounded-2xl border border-line bg-white shadow-[0_18px_50px_-14px_rgb(11_63_42/0.3)]">
-      <p className="border-b border-line px-5 py-3.5 text-[14px] font-semibold tracking-tight">Home Energy Certificate</p>
-      <div className="px-5 pb-3 pt-4">
-        <span className="rounded-md bg-forest px-2 py-1 text-xs font-semibold text-white">Grade B</span>
-        <p className="mt-3.5 text-[17px] font-medium tracking-tight">
-          <span className="text-[30px] font-semibold text-forest">2.1</span> <Co2Text text="tCO₂e / year" />
-        </p>
-        <p className="text-[13px] text-leaf">Verified savings</p>
-        <dl className="mt-3">
-          {certificate.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="flex items-center gap-2 border-t border-line py-2 text-xs">
-              <Icon size={15} className="text-leaf" aria-hidden />
-              <dt className="text-body">{label}</dt>
-              <dd className="ml-auto whitespace-nowrap font-semibold"><Co2Text text={value} /></dd>
-            </div>
-          ))}
-        </dl>
-        <div className="flex items-center justify-between border-t border-line pt-2.5 text-[11px] text-muted">
-          Sample home, annualised
-          <ChevronRight size={15} aria-hidden />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function HomePage() {
   return (
@@ -134,7 +101,7 @@ export default function HomePage() {
             />
             <div aria-hidden className="absolute inset-y-0 left-0 hidden w-2/5 bg-gradient-to-r from-white to-transparent lg:block" />
             <div className="-mt-6 flex justify-center lg:absolute lg:bottom-10 lg:left-[-6%] lg:mt-0">
-              <Certificate />
+              <HeroCertificate />
             </div>
           </div>
         </section>

@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BarChart3, ChevronRight, CircleDollarSign, Coins, Download, Layers, PlayCircle, ShieldCheck, Smartphone, Sun, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, ChevronRight, CircleDollarSign, Coins, Download, Layers, MessageCircle, PlayCircle, ShieldCheck, Smartphone, Sun, Zap } from "lucide-react";
 import { Audience } from "@/components/Audience";
+import { ChatChannels } from "@/components/ChatChannels";
 import { DashboardShowcase } from "@/components/DashboardShowcase";
 import { PhoneShowcase } from "@/components/PhoneShowcase";
 import { Co2Text } from "@/components/Co2Text";
@@ -101,6 +102,9 @@ export default function HomePage() {
                 </a>
                 <a href="#get-the-app" className="inline-flex items-center gap-1.5 text-forest hover:underline">
                   <Smartphone size={16} className="text-leaf" /> Get the Android app
+                </a>
+                <a href="#chat" className="inline-flex items-center gap-1.5 text-forest hover:underline">
+                  <MessageCircle size={16} className="text-leaf" /> Ask on Telegram
                 </a>
               </div>
               <div className="mt-8 flex items-center gap-5">
@@ -233,6 +237,8 @@ export default function HomePage() {
           </div>
         </section>
 
+        <ChatChannels />
+
         <section aria-label="Key figures" className="border-t border-line bg-mint">
           <div className="mx-auto grid max-w-[1160px] gap-x-8 gap-y-7 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1fr_1fr_1fr_1.35fr]">
             {stats.map((stat, index) => (
@@ -254,6 +260,7 @@ export default function HomePage() {
             <VerifyButton className="hover:text-white">Registry</VerifyButton>
             <Link href="/streets/" className="hover:text-white">Street grades</Link>
             <a href="#get-the-app" className="hover:text-white">Android app</a>
+            <a href="#chat" className="hover:text-white">Telegram &amp; WhatsApp</a>
           </nav>
           <p className="text-xs">Sandbox environment. Records shown are demonstration data.</p>
         </div>

@@ -56,3 +56,31 @@ dialog::backdrop {
   .kx-float, .kx-float-tilt, .kx-progress { animation: none; }
   .kx-float-tilt { transform: rotate(var(--kx-tilt, -8deg)); }
 }
+
+/* Landing-page chat previews (Telegram and WhatsApp). */
+.kx-tg-wallpaper {
+  background-color: #c9dcb0;
+  background-image:
+    radial-gradient(circle at 20% 15%, rgb(255 255 255 / 0.35), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgb(160 200 120 / 0.55), transparent 45%),
+    radial-gradient(rgb(90 130 60 / 0.16) 1px, transparent 1.6px);
+  background-size: 100% 100%, 100% 100%, 14px 14px;
+}
+.kx-wa-wallpaper {
+  background-color: #efeae2;
+  background-image: radial-gradient(rgb(120 100 70 / 0.12) 1px, transparent 1.6px);
+  background-size: 12px 12px;
+}
+@keyframes kx-msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kx-dot {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.kx-msg-in { animation: kx-msg-in 0.28s ease-out both; }
+.kx-dot { animation: kx-dot 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-msg-in, .kx-dot { animation: none; }
+}

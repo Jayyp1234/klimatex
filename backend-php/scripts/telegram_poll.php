@@ -30,8 +30,15 @@ echo 'polling as @' . $me['result']['username'] . PHP_EOL;
 $bot = new TelegramService();
 $offset = 0;
 while (true) {
-    $res = App\Services\Bank\Http::call('POST', 'https://api.telegram.org/bot' . App\Config\Settings::telegramToken() . '/getUpdates',
-        ['offset' => $offset, 'timeout' => 25, 'allowed_updates' => ['message', 'callback_query']], [], 35)[1] ?? [];
+    try {
+        $res = App\Services\Bank\Http::call('POST', 'https://api.telegram.org/bot' . App\Config\Settings::telegramToken() . '/getUpdates',
+            ['offset' => $offset, 'timeout' => 25, 'allowed_updates' => ['message', 'callback_query']], [], 35)[1] ?? [];
+    } catch (Throwable $e) {
+        // A dropped connection or timeout: wait a moment and poll again.
+        echo date('H:i:s') . ' poll failed (' . get_class($e) . '), retrying' . PHP_EOL;
+        sleep(3);
+        continue;
+    }
     if (!($res['ok'] ?? false)) {
         sleep(2);
         continue;

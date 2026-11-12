@@ -59,17 +59,16 @@ dialog::backdrop {
 
 /* Landing-page chat previews (Telegram and WhatsApp). */
 .kx-tg-wallpaper {
-  background-color: #c9dcb0;
+  background-color: #b5d29a;
   background-image:
-    radial-gradient(circle at 20% 15%, rgb(255 255 255 / 0.35), transparent 40%),
-    radial-gradient(circle at 85% 80%, rgb(160 200 120 / 0.55), transparent 45%),
-    radial-gradient(rgb(90 130 60 / 0.16) 1px, transparent 1.6px);
-  background-size: 100% 100%, 100% 100%, 14px 14px;
+    url("/images/chat-doodles-tg.svg"),
+    linear-gradient(160deg, #dbe8b3 0%, #b7d59b 38%, #8fc49a 72%, #9dc8a8 100%);
+  background-size: 190px 190px, 100% 100%;
 }
 .kx-wa-wallpaper {
   background-color: #efeae2;
-  background-image: radial-gradient(rgb(120 100 70 / 0.12) 1px, transparent 1.6px);
-  background-size: 12px 12px;
+  background-image: url("/images/chat-doodles-wa.svg");
+  background-size: 190px 190px;
 }
 @keyframes kx-msg-in {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }

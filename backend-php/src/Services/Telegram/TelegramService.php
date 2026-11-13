@@ -248,10 +248,6 @@ final class TelegramService
             $this->notLinked($chatId);
             return;
         }
-        if (BotOnboarding::pending((int) $link['household_id'])) {
-            $this->signup()->tracker($chatId, $link, null, BotOnboarding::t($link['lang'], 'pending_q'));
-            return;
-        }
         if (preg_match('~^/help(?:@\w+)?$~', $text)) {
             $this->reply($chatId, BotText::t($link['lang'], 'help'), $link);
             return;
@@ -512,10 +508,6 @@ final class TelegramService
         if (!$user || (int) $user['household_id'] !== (int) $link['household_id']) {
             Database::run('DELETE FROM telegram_links WHERE chat_id = ?', [$chatId]);
             $this->notLinked($chatId);
-            return;
-        }
-        if (BotOnboarding::pending((int) $link['household_id'])) {
-            $this->signup()->tracker($chatId, $link, null, BotOnboarding::t($link['lang'], 'pending_q'));
             return;
         }
         self::api('sendChatAction', ['chat_id' => $chatId, 'action' => 'typing']);

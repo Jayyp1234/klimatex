@@ -7,35 +7,31 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  BellRing,
+  BatteryCharging,
   Check,
   CircleHelp,
-  Coins,
-  FileBadge,
-  Fuel,
   Home,
-  Landmark,
   LoaderCircle,
   LogIn,
   MapPin,
-  MessageSquareText,
   Phone,
-  Recycle,
   ShieldCheck,
+  SolarPanel,
   Sun,
   UserRound,
   Wallet,
-  Wrench,
+  Zap,
 } from "lucide-react";
 import { CodeInput } from "@/components/app/CodeInput";
 import { weakPin } from "@/components/app/PhoneSignIn";
 import { ApiError, getSession } from "@/lib/api";
 import { links } from "@/lib/links";
-import { formatNaira } from "@/lib/marketplace";
+import { formatNaira, initialsOf } from "@/lib/marketplace";
 import {
   createAccount,
   loadCatalogue,
   loadMine,
+  packageFit,
   packageSpec,
   priceRange,
   saveAnswers,
@@ -47,7 +43,8 @@ import {
   type Package,
   type Path,
 } from "@/lib/onboarding";
-import { EstimateFigures, InlineError, InstallerBadge, fieldClass, primaryButton, secondaryButton } from "./parts";
+import { HOW_IT_WORKS, HaveSolarArt, HeroIllustration, NeedSolarArt, Spot, type SpotKind } from "./illustrations";
+import { EstimateFigures, InlineError, InstallerBadge, PackageCard, PriceBar, fieldClass, primaryButton, secondaryButton } from "./parts";
 
 type Step =
   | "welcome"
@@ -113,17 +110,32 @@ function Progress({ path, step, loan }: { path: Path; step: Step; loan: boolean 
   const stages = PROGRESS[path].map((s) => (loan && s.steps.includes("request") ? { ...s, label: "Loan check and request" } : s));
   const index = stages.findIndex((s) => s.steps.includes(step));
   if (index < 0) return null;
+  const all = [...stages, { label: "Track your home", steps: [] as Step[] }];
   return (
-    <div className="mb-8">
+    <nav aria-label="Sign-up progress" className="mb-8">
       <p className="text-[13px] font-medium text-body">
-        Step {index + 1} of {stages.length + 1} · <span className="text-ink">{stages[index].label}</span>
+        Step {index + 1} of {all.length} · <span className="text-ink">{stages[index].label}</span>
       </p>
-      <ol className="mt-2.5 flex gap-1.5" aria-hidden>
-        {[...stages, { label: "Track your home" }].map((s, i) => (
-          <li key={s.label} className={`h-1.5 flex-1 rounded-full ${i < index ? "bg-forest" : i === index ? "bg-leaf" : "bg-mint-strong"}`} />
-        ))}
+      <ol className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${all.length}, minmax(0, 1fr))` }}>
+        {all.map((s, i) => {
+          const state = i < index ? "done" : i === index ? "current" : "todo";
+          return (
+            <li key={s.label} aria-current={state === "current" ? "step" : undefined} className="min-w-0">
+              <span className="block h-1.5 overflow-hidden rounded-full bg-mint-strong">
+                <span
+                  className={`block h-full rounded-full transition-[width,background-color] duration-500 ease-out motion-reduce:transition-none ${state === "done" ? "w-full bg-forest" : state === "current" ? "w-1/2 bg-leaf" : "w-0"}`}
+                />
+              </span>
+              <span className={`mt-2 hidden items-center gap-1 text-[11.5px] leading-tight sm:flex ${state === "todo" ? "text-muted" : "font-medium text-ink"}`}>
+                {state === "done" && <Check size={12} className="shrink-0 text-leaf" aria-hidden />}
+                <span className="min-w-0 truncate">{s.label}</span>
+              </span>
+              <span className="sr-only">{state === "done" ? " (done)" : state === "current" ? " (current step)" : " (to come)"}</span>
+            </li>
+          );
+        })}
       </ol>
-    </div>
+    </nav>
   );
 }
 
@@ -135,9 +147,10 @@ function BackButton({ onClick, children = "Back" }: { onClick: () => void; child
   );
 }
 
-function Heading({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
+function Heading({ children, sub, art }: { children: ReactNode; sub?: ReactNode; art?: SpotKind }) {
   return (
     <>
+      {art && <Spot kind={art} size={60} className="mb-5" />}
       <h1 tabIndex={-1} data-step-heading className="text-[28px] font-semibold leading-tight tracking-[-0.03em] text-ink outline-none sm:text-[32px]">{children}</h1>
       {sub && <p className="mt-2 max-w-[560px] text-[15px] leading-relaxed text-body">{sub}</p>}
     </>
@@ -145,23 +158,23 @@ function Heading({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
 }
 
 /** A large button that picks one answer. */
-function Choice({ icon, title, body, onClick, selected, busy = false }: { icon: ReactNode; title: string; body: string; onClick: () => void; selected?: boolean; busy?: boolean }) {
+function Choice({ icon, art, title, body, onClick, selected, busy = false }: { icon?: ReactNode; art?: ReactNode; title: string; body: string; onClick: () => void; selected?: boolean; busy?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       disabled={busy}
-      className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-leaf/30 disabled:opacity-60 sm:p-5 ${
-        selected ? "border-forest bg-mint ring-1 ring-forest" : "border-line bg-white hover:border-forest/40 hover:bg-[#fafcf9]"
+      className={`group flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-leaf/30 disabled:opacity-60 sm:p-5 ${
+        selected ? "border-forest bg-mint ring-1 ring-forest" : "border-line bg-white hover:-translate-y-px hover:border-forest/40 hover:bg-[#fafcf9] hover:shadow-[0_12px_28px_-22px_rgb(11_63_42/0.5)] motion-reduce:hover:translate-y-0"
       }`}
     >
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${selected ? "bg-forest text-white" : "bg-mint text-forest"}`}>{icon}</span>
+      {art ?? <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${selected ? "bg-forest text-white" : "bg-mint text-forest"}`}>{icon}</span>}
       <span className="min-w-0 flex-1">
         <span className="block text-[16px] font-semibold text-ink">{title}</span>
         <span className="mt-0.5 block text-[14px] leading-snug text-body">{body}</span>
       </span>
-      {busy ? <LoaderCircle size={18} className="mt-1 shrink-0 animate-spin text-muted" aria-hidden /> : <ArrowRight size={18} className="mt-1 shrink-0 text-muted" aria-hidden />}
+      {busy ? <LoaderCircle size={18} className="shrink-0 animate-spin text-muted" aria-hidden /> : <ArrowRight size={18} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-forest motion-reduce:transition-none" aria-hidden />}
     </button>
   );
 }
@@ -353,23 +366,24 @@ export function GetStarted() {
   } else if (step === "welcome") {
     screen = (
       <section>
+        <HeroIllustration className="-mx-2 mb-6 h-auto w-[calc(100%+16px)] max-w-[480px] sm:mx-0 sm:w-full" />
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-leaf">For families in Lagos</p>
         <Heading sub="KlimateX reads your solar inverter, counts the petrol your generator no longer burns, and pays your family for the carbon it keeps out of the air.">
           Solar that pays your family back
         </Heading>
         <div className="mt-8 space-y-3">
-          <Choice icon={<CircleHelp size={22} />} title="What is KlimateX?" body="A one-minute explainer." onClick={() => go("explain")} />
           <Choice icon={<Sun size={22} />} title="Get started" body="Find solar for your home, or link the solar you already have. No sign-up until you've seen what you get." onClick={() => go("triage")} />
+          <Choice icon={<CircleHelp size={22} />} title="What is KlimateX?" body="How it works, in four steps." onClick={() => go("explain")} />
           <Link
             href={links.signIn}
-            className="flex w-full items-start gap-4 rounded-2xl border border-line bg-white p-4 text-left transition hover:border-forest/40 hover:bg-[#fafcf9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-leaf/30 sm:p-5"
+            className="group flex w-full items-center gap-4 rounded-2xl border border-line bg-white p-4 text-left transition duration-200 hover:-translate-y-px hover:border-forest/40 hover:bg-[#fafcf9] hover:shadow-[0_12px_28px_-22px_rgb(11_63_42/0.5)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-leaf/30 motion-reduce:hover:translate-y-0 sm:p-5"
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-mint text-forest"><LogIn size={22} /></span>
             <span className="min-w-0 flex-1">
               <span className="block text-[16px] font-semibold text-ink">I have an account</span>
               <span className="mt-0.5 block text-[14px] leading-snug text-body">Sign in with your phone number and PIN.</span>
             </span>
-            <ArrowRight size={18} className="mt-1 shrink-0 text-muted" aria-hidden />
+            <ArrowRight size={18} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-forest motion-reduce:transition-none" aria-hidden />
           </Link>
         </div>
       </section>
@@ -379,7 +393,18 @@ export function GetStarted() {
       <section>
         <BackButton onClick={() => go("welcome")} />
         <Heading>What is KlimateX?</Heading>
-        <div className="mt-4 space-y-3 text-[15px] leading-relaxed text-body">
+        <ol className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="How it works in four steps">
+          <span aria-hidden className="absolute left-[12%] right-[12%] top-[34px] hidden border-t-2 border-dashed border-forest/20 sm:block" />
+          {HOW_IT_WORKS.map((item, i) => (
+            <li key={item.title} className="relative flex min-w-0 flex-col items-start rounded-2xl border border-line bg-white p-3.5 sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:text-center">
+              <Spot kind={item.kind} size={52} tone="white" className="rounded-[18px] shadow-[0_6px_18px_-12px_rgb(11_63_42/0.5)] ring-1 ring-line" />
+              <p className="mt-3 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-leaf">Step {i + 1}</p>
+              <p className="mt-0.5 text-[15px] font-semibold leading-snug text-ink">{item.title}</p>
+              <p className="mt-1 text-[13px] leading-snug text-body">{item.body}</p>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-8 space-y-3 text-[15px] leading-relaxed text-body">
           <p>
             KlimateX connects your home&apos;s solar inverter to a carbon record. Every day it reads how much power your panels made and works out the petrol a generator
             would have burned to make it.
@@ -411,7 +436,7 @@ export function GetStarted() {
         <Heading sub="Either way, you'll see what you get before we ask for your number.">Do you already have solar, or do you need it?</Heading>
         <div className="mt-8 space-y-3">
           <Choice
-            icon={<Wrench size={22} />}
+            art={<NeedSolarArt className="h-[72px] w-[86px] shrink-0" />}
             title="I need solar"
             body="See every KlimateX installer's packages and prices, with what each one could save you."
             onClick={() => {
@@ -420,7 +445,7 @@ export function GetStarted() {
             }}
           />
           <Choice
-            icon={<Sun size={22} />}
+            art={<HaveSolarArt className="h-[72px] w-[86px] shrink-0" />}
             title="I already have solar"
             body="Link your inverter and start earning from the solar you already paid for."
             onClick={() => {
@@ -444,49 +469,47 @@ export function GetStarted() {
           )
         ) : (
           <>
-            <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-line bg-white px-5 py-4">
-                <dt className="text-[13px] text-body">All packages</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold tracking-tight">{priceRange(...catalogue.price_range_naira)}</dd>
-              </div>
-              <div className="rounded-2xl border border-forest/20 bg-mint px-5 py-4">
-                <dt className="text-[13px] text-body">A typical family home</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold tracking-tight text-forest">{priceRange(...catalogue.family_home_range_naira)}</dd>
-              </div>
-            </dl>
+            <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-white md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+              <Image src="/images/hero-roof.webp" alt="Solar panels on a Lagos rooftop" width={928} height={290} className="h-[110px] w-full object-cover md:h-full" />
+              <dl className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+                <div className="rounded-xl bg-[#f6f8f5] px-4 py-3">
+                  <dt className="text-[13px] text-body">All packages</dt>
+                  <dd className="mt-0.5 text-[17px] font-semibold tracking-tight">{priceRange(...catalogue.price_range_naira)}</dd>
+                </div>
+                <div className="rounded-xl bg-mint px-4 py-3 ring-1 ring-forest/15">
+                  <dt className="text-[13px] text-body">A typical family home</dt>
+                  <dd className="mt-0.5 text-[17px] font-semibold tracking-tight text-forest">{priceRange(...catalogue.family_home_range_naira)}</dd>
+                </div>
+              </dl>
+            </div>
             <p className="mt-3 rounded-xl border border-dashed border-[#e3a600]/60 bg-[#fdf6e3] px-4 py-3 text-[13.5px] text-[#633806]">{catalogue.note}</p>
 
             <div className="mt-8 space-y-8">
               {catalogue.installers.map((installer) => (
                 <section key={installer.id} aria-labelledby={`installer-${installer.id}`} className="rounded-2xl border border-line bg-[#fbfcfa] p-4 sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                    <div className="min-w-0">
-                      <h2 id={`installer-${installer.id}`} className="text-[18px] font-semibold tracking-tight">{installer.name}</h2>
-                      <p className="mt-0.5 flex items-center gap-1 text-[13px] text-body"><MapPin size={13} aria-hidden /> {installer.area} · {installer.accreditation_id}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-forest text-[14px] font-semibold text-lime">{initialsOf(installer.name)}</span>
+                      <div className="min-w-0">
+                        <h2 id={`installer-${installer.id}`} className="text-[18px] font-semibold leading-snug tracking-tight">{installer.name}</h2>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[13px] text-body"><MapPin size={13} aria-hidden /> {installer.area} · {installer.accreditation_id}</p>
+                      </div>
                     </div>
                     <InstallerBadge installer={installer} />
                   </div>
                   <p className="mt-2 text-[14px] text-body">{installer.blurb}</p>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     {installer.packages.map((p) => (
-                      <article key={p.id} className="flex flex-col rounded-xl border border-line bg-white p-4">
-                        <h3 className="text-[16px] font-semibold">{p.name}</h3>
-                        <p className="mt-0.5 text-[12.5px] text-body">{packageSpec(p)}</p>
-                        <p className="mt-2 text-[13.5px] text-ink"><span className="text-body">Powers:</span> {p.powers}</p>
-                        <p className="mt-3 text-[19px] font-semibold tracking-tight text-forest">{priceRange(p.price_min_naira, p.price_max_naira)}</p>
-                        <div className="mt-3 flex-1"><EstimateFigures estimate={p.estimate} compact /></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPackageId(p.id);
-                            go("package");
-                          }}
-                          aria-label={`Choose ${p.name} from ${installer.name}`}
-                          className={`${secondaryButton} mt-4 h-11 w-full border-forest/30 text-forest`}
-                        >
-                          Choose this package
-                        </button>
-                      </article>
+                      <PackageCard
+                        key={p.id}
+                        pkg={p}
+                        range={catalogue.price_range_naira}
+                        selected={packageId === p.id}
+                        onChoose={() => {
+                          setPackageId(p.id);
+                          go("package");
+                        }}
+                      />
                     ))}
                   </div>
                 </section>
@@ -500,15 +523,28 @@ export function GetStarted() {
     screen = (
       <section>
         <BackButton onClick={() => go("catalog")}>All packages</BackButton>
-        <Heading sub={`From ${pkgInstaller.name}, ${pkgInstaller.area}.`}>{pkg.name}</Heading>
+        <Heading art="package" sub={`From ${pkgInstaller.name}, ${pkgInstaller.area}. Best for ${packageFit(pkg).bestFor}.`}>{pkg.name}</Heading>
         <div className="mt-6 rounded-2xl border border-line bg-white p-5">
           <div className="flex flex-wrap items-center gap-2"><InstallerBadge installer={pkgInstaller} /></div>
           <p className="mt-3 text-[13px] text-body">Price range</p>
-          <p className="text-[26px] font-semibold tracking-tight text-forest">{priceRange(pkg.price_min_naira, pkg.price_max_naira)}</p>
-          <dl className="mt-4 grid gap-3 border-t border-line pt-4 text-[14px] sm:grid-cols-2">
-            <div><dt className="text-body">System</dt><dd className="font-medium">{packageSpec(pkg)}</dd></div>
+          <p className="text-[22px] font-semibold tracking-tight text-forest sm:text-[26px]">{priceRange(pkg.price_min_naira, pkg.price_max_naira)}</p>
+          <PriceBar min={pkg.price_min_naira} max={pkg.price_max_naira} range={catalogue.price_range_naira} />
+          <ul className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
+            {[
+              { icon: Zap, label: "Inverter", value: `${pkg.inverter_kva} kVA` },
+              { icon: BatteryCharging, label: "Battery", value: `${pkg.battery_kwh} kWh` },
+              { icon: SolarPanel, label: "Panels", value: `${pkg.panels} × ${pkg.panel_w} W` },
+            ].map(({ icon: Icon, label, value }) => (
+              <li key={label} className="min-w-0 rounded-xl bg-[#f6f8f5] px-3 py-2.5">
+                <Icon size={17} className="text-leaf" aria-hidden />
+                <p className="mt-1.5 text-[12px] text-body">{label}</p>
+                <p className="break-words text-[14px] font-semibold text-ink">{value}</p>
+              </li>
+            ))}
+          </ul>
+          <dl className="mt-4 grid gap-3 text-[14px] sm:grid-cols-2">
             <div><dt className="text-body">Panel size</dt><dd className="font-medium">{pkg.panel_kwp} kWp</dd></div>
-            <div className="sm:col-span-2"><dt className="text-body">What it powers</dt><dd className="font-medium">{pkg.powers}</dd></div>
+            <div><dt className="text-body">What it powers</dt><dd className="font-medium">{pkg.powers}</dd></div>
           </dl>
         </div>
         <div className="mt-4"><EstimateFigures estimate={pkg.estimate} /></div>
@@ -525,7 +561,7 @@ export function GetStarted() {
         <Heading sub={`${pkg.name}: ${priceRange(pkg.price_min_naira, pkg.price_max_naira)}. You can still change your mind before you accept the quote.`}>How will you pay?</Heading>
         <div className="mt-8 space-y-3">
           <Choice
-            icon={<Coins size={22} />}
+            art={<Spot kind="payment" size={52} />}
             title="Cash"
             body="Pay the installer directly once you accept their quote."
             selected={payment === "cash"}
@@ -535,7 +571,7 @@ export function GetStarted() {
             }}
           />
           <Choice
-            icon={<Landmark size={22} />}
+            art={<Spot kind="loan" size={52} />}
             title="Loan required"
             body="After you create your account, a quick Access Bank pre-check shows how much you could borrow. Your carbon income can help repay it."
             selected={payment === "loan"}
@@ -548,21 +584,22 @@ export function GetStarted() {
       </section>
     );
   } else if (step === "perks" && path === "have") {
-    const perks = [
-      { icon: BellRing, title: "Alerts that save your system", body: "We tell you when output drops or your inverter goes offline." },
-      { icon: Recycle, title: "A trade-in for your generator", body: "Hand in the generator you kept and a licensed recycler scraps it." },
-      { icon: FileBadge, title: "A grade and certificate", body: "An A–G Home Energy Certificate measured from your own inverter." },
-      { icon: Landmark, title: "Upgrade loans priced on your data", body: "More panels or a bigger battery, priced on how your home actually performs." },
-      { icon: Coins, title: "Carbon payouts", body: "From the day you join, never backdated, and only once the verifier confirms your home qualifies." },
+    const perks: { kind: SpotKind; title: string; body: string }[] = [
+      { kind: "alert", title: "Alerts that save your system", body: "We tell you when output drops or your inverter goes offline." },
+      { kind: "tradein", title: "A trade-in for your generator", body: "Hand in the generator you kept and a licensed recycler scraps it." },
+      { kind: "certificate", title: "A grade and certificate", body: "An A–G Home Energy Certificate measured from your own inverter." },
+      { kind: "loan", title: "Upgrade loans priced on your data", body: "More panels or a bigger battery, priced on how your home actually performs." },
+      { kind: "payout", title: "Carbon payouts", body: "From the day you join, never backdated, and only once the verifier confirms your home qualifies." },
     ];
     screen = (
       <section>
         <BackButton onClick={() => go("triage")} />
+        <HaveSolarArt className="mb-4 h-[88px] w-[106px]" />
         <Heading sub="Link your inverter and KlimateX starts reading it every day.">Your solar can do more for you</Heading>
         <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-          {perks.map(({ icon: Icon, title, body }) => (
-            <li key={title} className="flex items-start gap-3 rounded-2xl border border-line bg-white p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-mint text-forest"><Icon size={19} aria-hidden /></span>
+          {perks.map(({ kind, title, body }, i) => (
+            <li key={title} className={`flex items-start gap-3.5 rounded-2xl border border-line bg-white p-4 ${i === perks.length - 1 ? "sm:col-span-2" : ""}`}>
+              <Spot kind={kind} size={52} />
               <span className="min-w-0">
                 <span className="block text-[15px] font-semibold">{title}</span>
                 <span className="mt-0.5 block text-[13.5px] leading-snug text-body">{body}</span>
@@ -580,7 +617,7 @@ export function GetStarted() {
     screen = (
       <section>
         <BackButton onClick={() => go(path === "have" ? "perks" : "payment")} />
-        <Heading sub="We'll text you a 6-digit code. This number becomes how you sign in.">What&apos;s your phone number?</Heading>
+        <Heading art="phone" sub="We'll text you a 6-digit code. This number becomes how you sign in.">What&apos;s your phone number?</Heading>
         <form
           className="mt-8 space-y-5"
           onSubmit={(event) => {
@@ -628,8 +665,7 @@ export function GetStarted() {
     screen = (
       <section>
         <BackButton onClick={() => go("phone")}>Use a different number</BackButton>
-        <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-mint text-forest ring-1 ring-forest/10"><MessageSquareText size={22} aria-hidden /></span>
-        <Heading sub={`We sent a 6-digit code to ${masked}. It works for 10 minutes.`}>Check your messages</Heading>
+        <Heading art="code" sub={`We sent a 6-digit code to ${masked}. It works for 10 minutes.`}>Check your messages</Heading>
         {demoCode && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[#e3a600]/60 bg-[#fdf6e3] px-4 py-3 text-sm text-[#633806]">
             <span>
@@ -673,7 +709,7 @@ export function GetStarted() {
   } else if (step === "account") {
     screen = (
       <section>
-        <Heading sub="Three quick things and your account is ready.">Set up your account</Heading>
+        <Heading art="account" sub="Three quick things and your account is ready.">Set up your account</Heading>
         <form className="mt-8 space-y-6" onSubmit={submitAccount}>
           <div>
             <label htmlFor="signup-name" className="text-sm font-medium text-ink">Your name</label>
@@ -719,7 +755,7 @@ export function GetStarted() {
     const minPrice = view.package?.price_min_naira ?? 0;
     screen = (
       <section>
-        <Heading sub={loan ? "First a quick, no-obligation Access Bank pre-check. Then your request goes to the installer." : "The installer accepts in the app, books a survey and sends you a quote."}>
+        <Heading art={loan ? "loan" : "request"} sub={loan ? "First a quick, no-obligation Access Bank pre-check. Then your request goes to the installer." : "The installer accepts in the app, books a survey and sends you a quote."}>
           {loan ? "Your loan pre-check" : `Send your request to ${installerName}`}
         </Heading>
         {view.package && (
@@ -774,7 +810,7 @@ export function GetStarted() {
           onClick={() => run("submit", async () => advance(await submitRequest()))}
           className={`${primaryButton} mt-4 w-full`}
         >
-          <Busy busy={busy === "submit"}>{`Send request to ${installerName}`}</Busy>
+          <Busy busy={busy === "submit"}>Send my request</Busy>
         </button>
         {loan && !banded && <p className="mt-2 text-center text-[13px] text-muted">Choose an income range first.</p>}
       </section>
@@ -782,7 +818,7 @@ export function GetStarted() {
   } else if (step === "inverter" && view && catalogue) {
     screen = (
       <section>
-        <Heading sub="Find the brand and serial number on the sticker on the side of your inverter. Your installer checks it at the visit.">Link your inverter</Heading>
+        <Heading art="inverter" sub="Find the brand and serial number on the sticker on the side of your inverter. Your installer checks it at the visit.">Link your inverter</Heading>
         <form
           className="mt-8 space-y-5"
           onSubmit={(event) => {
@@ -831,7 +867,7 @@ export function GetStarted() {
           {catalogue.options.generator.map((g) => (
             <Choice
               key={g.key}
-              icon={g.key === "trade_in" ? <Recycle size={22} /> : g.key === "backup" ? <Fuel size={22} /> : <Check size={22} />}
+              art={<Spot kind={g.key === "trade_in" ? "tradein" : g.key === "backup" ? "generator" : "verified"} size={52} />}
               title={g.label}
               body={GENERATOR_HELP[g.key] ?? ""}
               selected={view.generator === g.key}
@@ -847,9 +883,16 @@ export function GetStarted() {
     screen = (
       <section>
         <BackButton onClick={() => go("generator")}>Generator</BackButton>
-        <Heading sub="They confirm your inverter serial, take a GPS-tagged photo and note your generator. This stops anyone linking an inverter that isn't theirs. If your own installer is listed, pick them.">
-          Pick an installer for your check visit
-        </Heading>
+        <Heading sub="If your own installer is listed, pick them.">Pick an installer for your check visit</Heading>
+        <div className="mt-6 flex items-center gap-4 overflow-hidden rounded-2xl border border-line bg-white">
+          <Image src="/images/installer.webp" alt="" width={690} height={616} className="h-[112px] w-[112px] shrink-0 object-cover object-top sm:h-[124px] sm:w-[140px]" />
+          <ul className="min-w-0 space-y-1.5 py-3 pr-4 text-[13.5px] leading-snug text-ink">
+            <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-leaf" aria-hidden /> Confirms your inverter serial</li>
+            <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-leaf" aria-hidden /> Takes a GPS-tagged photo</li>
+            <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-leaf" aria-hidden /> Notes your generator</li>
+            <li className="text-[12.5px] text-body">This stops anyone linking an inverter that isn&apos;t theirs.</li>
+          </ul>
+        </div>
         <form
           className="mt-8 space-y-3"
           onSubmit={(event) => {
@@ -866,7 +909,8 @@ export function GetStarted() {
                   installerId === i.id ? "border-forest bg-mint ring-1 ring-forest" : "border-line bg-white hover:border-forest/40"
                 }`}
               >
-                <input type="radio" name="installer" value={i.id} checked={installerId === i.id} onChange={() => setInstallerId(i.id)} className="mt-1 h-4 w-4 accent-[#0b3f2a]" />
+                <input type="radio" name="installer" value={i.id} checked={installerId === i.id} onChange={() => setInstallerId(i.id)} className="mt-1 h-4 w-4 shrink-0 accent-[#0b3f2a]" />
+                <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-[13px] font-semibold text-lime">{initialsOf(i.name)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-[15px] font-semibold">{i.name}</span>
@@ -888,7 +932,7 @@ export function GetStarted() {
     // A step whose data isn't there (for example the catalogue failed): start the path again.
     screen = (
       <section>
-        <Heading>Let&apos;s start again</Heading>
+        <Heading art="home">Let&apos;s start again</Heading>
         <button type="button" onClick={() => go("welcome")} className={`${primaryButton} mt-6`}><Busy busy={false}>Back to the start</Busy></button>
       </section>
     );
@@ -906,7 +950,7 @@ export function GetStarted() {
       </header>
       <main ref={top} className={`mx-auto scroll-mt-4 px-4 pb-20 pt-10 sm:px-6 ${wide ? "max-w-[1100px]" : "max-w-[640px]"}`}>
         {path && !resuming && <Progress path={path} step={step} loan={payment === "loan"} />}
-        {screen}
+        <div key={step} className="kx-step-in">{screen}</div>
       </main>
     </div>
   );

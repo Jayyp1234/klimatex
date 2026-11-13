@@ -91,6 +91,27 @@ final class BotOnboarding
         'btn_accept' => ['en' => '✅ Accept quote', 'pcm' => '✅ Accept the quote'],
         'btn_continue' => ['en' => '▶️ Continue', 'pcm' => '▶️ Continue'],
         'pending_q' => ['en' => "I can answer questions about your home once it's live. Here's where you are:", 'pcm' => 'I go fit answer question about your house once e don live. See where you dey now:'],
+        'btn_change' => ['en' => '✏️ Change my choices', 'pcm' => '✏️ Change wetin I choose'],
+        'btn_cancel' => ['en' => '❌ Cancel request', 'pcm' => '❌ Cancel the request'],
+        'btn_restart' => ['en' => '🔁 Start again', 'pcm' => '🔁 Start again'],
+        'change_menu' => ['en' => "What would you like to change?\n\nYou can change your choices until you accept a quote. If your installer has already acted, your request goes to them again and any quote is dropped.", 'pcm' => "Wetin you wan change?\n\nYou fit change wetin you choose until you accept quote. If your installer don already act, your request go go back to dem again and any quote go cancel."],
+        'btn_change_pkg' => ['en' => '📦 Another package', 'pcm' => '📦 Another package'],
+        'btn_to_cash' => ['en' => '💵 Pay cash instead', 'pcm' => '💵 Make I pay cash'],
+        'btn_to_loan' => ['en' => '🏦 Use a loan instead', 'pcm' => '🏦 Make I use loan'],
+        'btn_change_inst' => ['en' => '🧰 Another installer', 'pcm' => '🧰 Another installer'],
+        'btn_change_gen' => ['en' => '🔌 Generator answer', 'pcm' => '🔌 Wetin I do with gen'],
+        'btn_change_inv' => ['en' => '🔗 Inverter details', 'pcm' => '🔗 Inverter details'],
+        'btn_profile' => ['en' => '👤 My name or area', 'pcm' => '👤 My name or area'],
+        'btn_change_name' => ['en' => '✍️ Change my name', 'pcm' => '✍️ Change my name'],
+        'profile_ask' => ['en' => 'Type your new name, or tap a new area below.', 'pcm' => 'Type your new name, or press new area for down.'],
+        'profile_done' => ['en' => '✅ Saved.', 'pcm' => '✅ E don save.'],
+        'changed' => ['en' => '✅ Done. Your choices are updated.', 'pcm' => '✅ E don do. Wetin you choose don change.'],
+        'locked_change' => ['en' => 'Your quote is accepted, so your choices are locked now. Contact your installer or support to change them.', 'pcm' => 'You don accept the quote, so you no fit change am again for here. Talk to your installer or support.'],
+        'cancel_confirm' => ['en' => 'Cancel your request? Your account stays, and you can start again any time.', 'pcm' => 'You wan cancel your request? Your account go still dey, and you fit start again anytime.'],
+        'btn_cancel_yes' => ['en' => 'Yes, cancel it', 'pcm' => 'Yes, cancel am'],
+        'btn_keep' => ['en' => 'No, keep it', 'pcm' => 'No, leave am'],
+        'pick_package' => ['en' => 'Pick the package you want instead.', 'pcm' => 'Pick the package wey you want instead.'],
+        'ask_hint' => ['en' => '💬 You can also ask me anything about your solar, the loan or the process. Just type or send a voice note.', 'pcm' => '💬 You fit also ask me anything about your solar, the loan or how e dey work. Just type or send voice note.'],
         'n_accepted' => ['en' => '👍 %s accepted your request. They will book a survey of your home.', 'pcm' => '👍 %s don accept your request. Dem go book time to come check your house.'],
         'n_survey' => ['en' => '📅 Survey booked for %s. Your quote follows after the visit.', 'pcm' => '📅 Dem go come check your house on %s. Your quote go follow after.'],
         'n_quoted' => ['en' => '🧾 Your quote from %s is ready: %s.', 'pcm' => '🧾 Your quote from %s don ready: %s.'],
@@ -156,13 +177,18 @@ final class BotOnboarding
     public function onText(string $chatId, string $text, string $lang, ?array $link): bool
     {
         $state = self::state($chatId);
-        if (!$state || !in_array($state['step'] ?? '', ['name', 'area', 'serial'], true)) {
+        if (!$state || !in_array($state['step'] ?? '', ['name', 'area', 'serial', 'pname'], true)) {
             return false;
         }
         match ($state['step']) {
             'name' => $this->gotName($chatId, $state, $text, $lang),
             'area' => $this->gotArea($chatId, $state, $text, $lang),
-            'serial' => $this->gotSerial($chatId, $text, $link),
+            'serial' => $this->gotSerial($chatId, $text, $link, $state),
+            'pname' => $this->step($chatId, $link, function ($hh) use ($chatId, $text) {
+                $view = $this->onboarding->profile($hh, ['name' => $text]);
+                self::clear($chatId);
+                return $view;
+            }, false, 'profile_done'),
         };
         return true;
     }
@@ -218,6 +244,24 @@ final class BotOnboarding
             'inst' => $this->step($chatId, $link, fn ($hh) => $this->onboarding->submit($hh, (int) $arg)),
             'accept' => $this->step($chatId, $link, fn ($hh) => $this->onboarding->acceptQuote($hh), false),
             'track' => $link ? $this->tracker($chatId, $link) : $this->askSolar($chatId, $lang),
+            'chg' => $this->changeMenu($chatId, $link),
+            'cpkl' => $link ? $this->packages($chatId, $link['lang'], 'o:cpk:', self::t($link['lang'], 'pick_package')) : $this->askSolar($chatId, $lang),
+            'cpk' => $this->changed($chatId, $link, ['package_id' => (int) $arg]),
+            'cpay' => $this->changed($chatId, $link, ['payment' => $arg]),
+            'cinl' => $link ? $this->installers($chatId, $link['lang'], 'o:cin:') : $this->askSolar($chatId, $lang),
+            'cin' => $this->changed($chatId, $link, ['installer_id' => (int) $arg]),
+            'cgl' => $link ? $this->generatorButtons($chatId, $link['lang'], 'o:cgen:') : $this->askSolar($chatId, $lang),
+            'cgen' => $this->changed($chatId, $link, ['generator' => $arg]),
+            'cinv' => $link ? $this->brandButtons($chatId, $link['lang'], 'o:cbr:') : $this->askSolar($chatId, $lang),
+            'cbr' => $link ? $this->askSerial($chatId, $link['lang'], ['brand' => $arg, 'change' => true]) : $this->askSolar($chatId, $lang),
+            'prof' => $link ? $this->profileMenu($chatId, $link['lang']) : $this->askSolar($chatId, $lang),
+            'parea' => $this->step($chatId, $link, function ($hh) use ($chatId, $arg) {
+                self::clear($chatId);
+                return $this->onboarding->profile($hh, ['area' => $arg]);
+            }, false, 'profile_done'),
+            'cxl' => $link ? $this->send($chatId, self::t($link['lang'], 'cancel_confirm'), ['inline_keyboard' => [
+                [['text' => self::t($link['lang'], 'btn_cancel_yes'), 'callback_data' => 'o:cxly'], ['text' => self::t($link['lang'], 'btn_keep'), 'callback_data' => 'o:track']]]]) : $this->askSolar($chatId, $lang),
+            'cxly' => $this->step($chatId, $link, fn ($hh) => $this->onboarding->cancel($hh)),
             'go' => $link ? $this->continue($chatId, $link, $this->onboarding->mine((int) $link['household_id'])) : $this->askSolar($chatId, $lang),
             default => $this->welcome($chatId, $lang),
         };
@@ -234,7 +278,7 @@ final class BotOnboarding
         ]]);
     }
 
-    private function packages(string $chatId, string $lang): void
+    private function packages(string $chatId, string $lang, string $prefix = 'o:pkg:', ?string $pick = null): void
     {
         $list = $this->catalog->list();
         $n = fn ($v) => BotCards::naira($v);
@@ -252,14 +296,14 @@ final class BotOnboarding
             foreach ($i['packages'] as $p) {
                 $lines[] = sprintf('   • %s: %s kVA, %s kWh battery, %d panels · <b>%s–%s</b>', BotCards::e($p['name']),
                     self::num($p['inverter_kva']), self::num($p['battery_kwh']), $p['panels'], $n($p['price_min_naira']), $n($p['price_max_naira']));
-                $buttons[] = [['text' => mb_substr($i['name'], 0, 18) . ' · ' . $p['name'], 'callback_data' => 'o:pkg:' . $p['id']]];
+                $buttons[] = [['text' => mb_substr($i['name'], 0, 18) . ' · ' . $p['name'], 'callback_data' => $prefix . $p['id']]];
             }
             $lines[] = '';
         }
         $lines[] = '<i>' . BotCards::e($list['note']) . '</i>';
         $lines[] = '';
-        $lines[] = self::t($lang, 'packages_pick');
-        $buttons[] = [['text' => self::t($lang, 'btn_back'), 'callback_data' => 'o:start']];
+        $lines[] = $pick ?? self::t($lang, 'packages_pick');
+        $buttons[] = [['text' => self::t($lang, 'btn_back'), 'callback_data' => $prefix === 'o:pkg:' ? 'o:start' : 'o:track']];
         $this->send($chatId, implode("\n", $lines), ['inline_keyboard' => $buttons], true);
     }
 
@@ -363,10 +407,14 @@ final class BotOnboarding
 
     // ----- After the account -----
 
-    private function gotSerial(string $chatId, string $text, ?array $link): void
+    private function gotSerial(string $chatId, string $text, ?array $link, array $state): void
     {
         if (!$link) {
             self::clear($chatId);
+            return;
+        }
+        if (!empty($state['change'])) {
+            $this->changed($chatId, $link, ['inverter_brand' => $state['brand'], 'inverter_serial' => $text], fn () => self::clear($chatId));
             return;
         }
         $this->step($chatId, $link, function ($hh) use ($chatId, $text) {
@@ -376,8 +424,79 @@ final class BotOnboarding
         });
     }
 
+    // ----- A change of heart -----
+
+    private function changeMenu(string $chatId, ?array $link): void
+    {
+        if (!$link) {
+            $this->askSolar($chatId, 'en');
+            return;
+        }
+        $lang = $link['lang'];
+        $view = $this->onboarding->mine((int) $link['household_id']);
+        $b = fn (string $key, string $data) => [['text' => self::t($lang, $key), 'callback_data' => $data]];
+        if (!$view['can_change']) {
+            $this->send($chatId, self::t($lang, 'locked_change'), ['inline_keyboard' => [$b('btn_profile', 'o:prof'), $b('btn_progress', 'o:track')]]);
+            return;
+        }
+        $rows = $view['path'] === 'need'
+            ? [$b('btn_change_pkg', 'o:cpkl'), $view['payment'] === 'loan' ? $b('btn_to_cash', 'o:cpay:cash') : $b('btn_to_loan', 'o:cpay:loan')]
+            : [$b('btn_change_inst', 'o:cinl'), $b('btn_change_inv', 'o:cinv'), $b('btn_change_gen', 'o:cgl')];
+        $rows[] = $b('btn_profile', 'o:prof');
+        if ($view['status'] !== 'cancelled') {
+            $rows[] = $b('btn_cancel', 'o:cxl');
+        }
+        $rows[] = $b('btn_progress', 'o:track');
+        $this->send($chatId, self::t($lang, 'change_menu'), ['inline_keyboard' => $rows]);
+    }
+
+    /** Applies a change and shows what comes next (a fresh loan check, or the tracker). */
+    private function changed(string $chatId, ?array $link, array $change, ?callable $after = null): void
+    {
+        if (!$link) {
+            $this->askSolar($chatId, 'en');
+            return;
+        }
+        try {
+            $view = $this->onboarding->change((int) $link['household_id'], $change);
+        } catch (HttpException $e) {
+            $this->send($chatId, $e->getMessage());
+            return;
+        }
+        if ($after) {
+            $after();
+        }
+        $this->send($chatId, self::t($link['lang'], 'changed'));
+        $this->continue($chatId, $link, $view);
+    }
+
+    private function profileMenu(string $chatId, string $lang): void
+    {
+        self::save($chatId, ['step' => 'pname']);
+        $rows = array_chunk(array_map(fn ($a) => ['text' => $a, 'callback_data' => "o:parea:$a"], self::AREAS), 3);
+        $this->send($chatId, self::t($lang, 'profile_ask'), ['inline_keyboard' => $rows]);
+    }
+
+    private function installers(string $chatId, string $lang, string $prefix): void
+    {
+        $this->send($chatId, self::t($lang, 'inst_ask'), ['inline_keyboard' => array_map(
+            fn ($i) => [['text' => $i['name'] . ' · ' . $i['area'], 'callback_data' => $prefix . $i['id']]], $this->catalog->list()['installers'])]);
+    }
+
+    private function generatorButtons(string $chatId, string $lang, string $prefix): void
+    {
+        $this->send($chatId, self::t($lang, 'gen_ask'), ['inline_keyboard' => array_map(
+            fn ($g) => [['text' => self::t($lang, "gen_$g"), 'callback_data' => $prefix . $g]], array_keys(OnboardingService::GENERATOR))]);
+    }
+
+    private function brandButtons(string $chatId, string $lang, string $prefix): void
+    {
+        $this->send($chatId, self::t($lang, 'brand_ask'), ['inline_keyboard' => array_chunk(array_map(
+            fn ($b) => ['text' => $b, 'callback_data' => $prefix . $b], OnboardingService::INVERTER_BRANDS), 3)]);
+    }
+
     /** Runs one step for a linked household, then shows what comes next. Errors are shown, the step stays. */
-    private function step(string $chatId, ?array $link, callable $fn, bool $show = true): void
+    private function step(string $chatId, ?array $link, callable $fn, bool $show = true, ?string $done = null): void
     {
         if (!$link) {
             $this->askSolar($chatId, 'en');
@@ -388,6 +507,9 @@ final class BotOnboarding
         } catch (HttpException $e) {
             $this->send($chatId, $e->getMessage());
             return;
+        }
+        if ($done) {
+            $this->send($chatId, self::t($link['lang'], $done));
         }
         if ($show) {
             $this->continue($chatId, $link, $view);
@@ -408,23 +530,19 @@ final class BotOnboarding
                     $view['package']['name'], BotCards::naira($view['package']['price_min_naira']), BotCards::naira($view['package']['price_max_naira'])) : null,
                 self::t($lang, 'send_ask', $installer)])),
                 ['inline_keyboard' => [[['text' => self::t($lang, 'btn_send'), 'callback_data' => 'o:send']]]]),
-            'link_inverter' => $view['inverter']['brand']
-                ? $this->askSerial($chatId, $lang)
-                : $this->send($chatId, self::t($lang, 'brand_ask'), ['inline_keyboard' => array_chunk(array_map(
-                    fn ($b) => ['text' => $b, 'callback_data' => "o:brand:$b"], OnboardingService::INVERTER_BRANDS), 3)]),
-            'generator' => $this->send($chatId, self::t($lang, 'gen_ask'), ['inline_keyboard' => [
-                [['text' => self::t($lang, 'gen_trade_in'), 'callback_data' => 'o:gen:trade_in']],
-                [['text' => self::t($lang, 'gen_backup'), 'callback_data' => 'o:gen:backup']],
-                [['text' => self::t($lang, 'gen_none'), 'callback_data' => 'o:gen:none']]]]),
-            'pick_installer' => $this->send($chatId, self::t($lang, 'inst_ask'), ['inline_keyboard' => array_map(
-                fn ($i) => [['text' => $i['name'] . ' · ' . $i['area'], 'callback_data' => 'o:inst:' . $i['id']]], $this->catalog->list()['installers'])]),
+            'link_inverter' => $view['inverter']['brand'] ? $this->askSerial($chatId, $lang) : $this->brandButtons($chatId, $lang, 'o:brand:'),
+            'generator' => $this->generatorButtons($chatId, $lang, 'o:gen:'),
+            'pick_installer' => $this->installers($chatId, $lang, 'o:inst:'),
+            'restart' => $view['path'] === 'need'
+                ? $this->packages($chatId, $lang, 'o:cpk:', self::t($lang, 'pick_package'))
+                : $this->installers($chatId, $lang, 'o:cin:'),
             default => $this->tracker($chatId, $link, $view),
         };
     }
 
-    private function askSerial(string $chatId, string $lang): void
+    private function askSerial(string $chatId, string $lang, array $extra = []): void
     {
-        self::save($chatId, ['step' => 'serial']);
+        self::save($chatId, ['step' => 'serial'] + $extra);
         $this->send($chatId, self::t($lang, 'serial_ask'));
     }
 
@@ -455,11 +573,20 @@ final class BotOnboarding
             $lines[] = '';
             $lines[] = self::t($lang, 'locked');
         }
+        if (!$view['certified']) {
+            $lines[] = '';
+            $lines[] = self::t($lang, 'ask_hint');
+        }
         $buttons = [];
         if (($view['next']['action'] ?? null) === 'accept_quote') {
             $buttons[] = [['text' => self::t($lang, 'btn_accept'), 'callback_data' => 'o:accept']];
+        } elseif (($view['next']['action'] ?? null) === 'restart') {
+            $buttons[] = [['text' => self::t($lang, 'btn_restart'), 'callback_data' => 'o:go']];
         } elseif (($view['next']['by'] ?? null) === 'family') {
             $buttons[] = [['text' => self::t($lang, 'btn_continue'), 'callback_data' => 'o:go']];
+        }
+        if (!$view['certified']) {
+            $buttons[] = [['text' => self::t($lang, 'btn_change'), 'callback_data' => 'o:chg']];
         }
         $buttons[] = [['text' => self::t($lang, 'btn_progress'), 'callback_data' => 'o:track'], ['text' => BotText::t($lang, 'btn_lang'), 'callback_data' => 'langs']];
         $this->send($chatId, implode("\n", $lines), ['inline_keyboard' => $buttons], true);
@@ -468,7 +595,9 @@ final class BotOnboarding
     /** The menu for a chat whose home is not certified yet. */
     public static function menu(string $lang): array
     {
-        return ['inline_keyboard' => [[['text' => self::t($lang, 'btn_progress'), 'callback_data' => 'o:track'], ['text' => BotText::t($lang, 'btn_lang'), 'callback_data' => 'langs']]]];
+        return ['inline_keyboard' => [
+            [['text' => self::t($lang, 'btn_progress'), 'callback_data' => 'o:track'], ['text' => self::t($lang, 'btn_change'), 'callback_data' => 'o:chg']],
+            [['text' => BotText::t($lang, 'btn_lang'), 'callback_data' => 'langs']]]];
     }
 
     /** Tells the family's chats what the installer (or Access) just did. */

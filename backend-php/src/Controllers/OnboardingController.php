@@ -62,6 +62,21 @@ final class OnboardingController
         return $this->onboarding->acceptQuote($request->user['household_id'] ?? null);
     }
 
+    public function profile(Request $request): array
+    {
+        return $this->onboarding->profile($request->user['household_id'] ?? null, $request->body ?? []);
+    }
+
+    public function change(Request $request): array
+    {
+        return $this->onboarding->change($request->user['household_id'] ?? null, $request->body ?? []);
+    }
+
+    public function cancel(Request $request): array
+    {
+        return $this->onboarding->cancel($request->user['household_id'] ?? null);
+    }
+
     public function requests(Request $request): array
     {
         return $this->onboarding->requests($request->user);

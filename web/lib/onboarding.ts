@@ -52,14 +52,18 @@ export type Catalogue = {
 };
 
 export type Path = "need" | "have";
-export type NextAction = "loan_check" | "send_request" | "link_inverter" | "generator" | "pick_installer" | "accept_quote" | null;
+export type NextAction = "loan_check" | "send_request" | "link_inverter" | "generator" | "pick_installer" | "accept_quote" | "restart" | null;
+
+/** Where a sign-up is. "cancelled" keeps the account; choosing again restarts it. */
+export type OnboardingStatus = "started" | "requested" | "accepted" | "survey" | "quoted" | "approved" | "visit" | "certified" | "cancelled";
 
 export type OnboardingStep = { key: string; label: string; done: boolean; current: boolean; at: string | null };
 
 export type OnboardingView = {
   id: number;
   path: Path;
-  status: string;
+  status: OnboardingStatus | string;
+  channel?: string;
   certified: boolean;
   site_id: number | null;
   area: string;
@@ -73,6 +77,8 @@ export type OnboardingView = {
   generator: string | null;
   steps: OnboardingStep[];
   next: { by: "family" | "installer" | null; action: NextAction; text: string };
+  /** True until the quote is accepted (and while cancelled): the family can change its choices or cancel. */
+  can_change: boolean;
   estimate: Estimate;
   events: { status: string; at: string; note?: string; label: string }[];
 };
@@ -107,6 +113,24 @@ export const submitRequest = (installerId?: number) =>
   api<OnboardingView>("/api/onboarding/mine/submit", { method: "POST", body: installerId ? { installer_id: installerId } : {} });
 export const acceptQuote = () => api<OnboardingView>("/api/onboarding/mine/accept-quote", { method: "POST" });
 
+/** Name and area can change at any time. */
+export const saveProfile = (body: { name?: string; area?: string }) => api<OnboardingView>("/api/onboarding/mine/profile", { method: "POST", body });
+
+export type ChangeInput = {
+  package_id?: number;
+  payment?: "cash" | "loan";
+  installer_id?: number;
+  inverter_brand?: string;
+  inverter_serial?: string;
+  generator?: string;
+};
+/**
+ * Changes package, payment, installer or inverter details while `can_change`. If the installer had already acted it goes
+ * out as a fresh request (quote and survey dropped). On a cancelled sign-up it restarts the request. 409 when locked, 422 when nothing changed.
+ */
+export const changeChoices = (body: ChangeInput) => api<OnboardingView>("/api/onboarding/mine/change", { method: "POST", body });
+export const cancelRequest = () => api<OnboardingView>("/api/onboarding/mine/cancel", { method: "POST" });
+
 export const loadRequests = () => api<{ requests: OnboardingRequest[] }>("/api/onboarding/requests").then((r) => r.requests);
 export const actOnRequest = (id: number, action: OnboardingRequest["actions"][number], body: { date?: string; amount_naira?: number } = {}) =>
   api<OnboardingRequest>(`/api/onboarding/requests/${id}/${action}`, { method: "POST", body });
@@ -117,6 +141,17 @@ export const priceRange = (min: number, max: number) => (min === max ? formatNai
 export const number = (value: number) => Math.round(value).toLocaleString("en-NG");
 export const packageSpec = (p: Pick<Package, "inverter_kva" | "battery_kwh" | "panels" | "panel_w">) =>
   `${p.inverter_kva} kVA inverter · ${p.battery_kwh} kWh battery · ${p.panels} × ${p.panel_w} W panels`;
+
+/** Package sizes in plain words, from the inverter size. */
+export function packageFit(p: Pick<Package, "inverter_kva">): { size: "Small" | "Medium" | "Large"; bestFor: string } {
+  if (p.inverter_kva <= 2) return { size: "Small", bestFor: "a flat or a few rooms" };
+  if (p.inverter_kva < 5) return { size: "Medium", bestFor: "a family home" };
+  return { size: "Large", bestFor: "a large home or estate" };
+}
+
+/** Naira typed into a field: digits only, shown with commas. */
+export const nairaDigits = (value: string) => value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12);
+export const nairaField = (digits: string) => (digits ? Number(digits).toLocaleString("en-NG") : "");
 
 export const GENERATOR_LABEL: Record<string, string> = { trade_in: "Trade it in", backup: "Keep it as backup", none: "No generator" };
 

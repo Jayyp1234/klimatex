@@ -321,11 +321,13 @@ export function HouseholdShell({ children }: { children: ReactNode }) {
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
+  // A family still signing up gets its tracker, and Ask KlimateX on the assistant page; the rest of the app opens once certified.
   if (user && onboarding) {
     return (
       <Tracker
         user={user}
         initial={onboarding}
+        page={path === `${BASE}assistant/` ? "assistant" : "dashboard"}
         onCertified={reload}
         onSignOut={async () => {
           await signOut();

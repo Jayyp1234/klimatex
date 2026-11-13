@@ -232,6 +232,121 @@ final class OnboardingService
         return $this->view((int) $o['household_id']);
     }
 
+    // ----- A change of heart -----
+
+    /** Statuses in which the family can still change its package, payment or installer, or cancel. */
+    public const CHANGEABLE = ['started', 'requested', 'accepted', 'survey', 'quoted', 'visit', 'cancelled'];
+
+    /** Name and area can change at any time. */
+    public function profile(?int $householdId, array $in): array
+    {
+        $o = $this->row($this->requireHousehold($householdId));
+        $set = [];
+        if (array_key_exists('name', $in)) {
+            $name = trim(preg_replace('/\s+/', ' ', (string) $in['name']));
+            if (mb_strlen($name) < 2 || mb_strlen($name) > 60) {
+                throw new HttpException(422, 'Enter your name, between 2 and 60 characters.', ['name']);
+            }
+            Database::run('UPDATE households SET name = ? WHERE id = ?', [$name, $o['household_id']]);
+            Database::run('UPDATE users SET name = ? WHERE id = ?', [$name, $o['user_id']]);
+        }
+        if (array_key_exists('area', $in)) {
+            $area = trim(preg_replace('/\s+/', ' ', (string) $in['area']));
+            if (mb_strlen($area) < 2 || mb_strlen($area) > 60) {
+                throw new HttpException(422, 'Enter the area the home is in, like Surulere or Yaba.', ['area']);
+            }
+            $set['area'] = $area;
+            if ($o['site_id']) {
+                Database::run('UPDATE sites SET area = ? WHERE id = ?', [$area, $o['site_id']]);
+            }
+        }
+        Database::update('onboardings', (int) $o['id'], $set + ['updated_at' => now_iso()]);
+        return $this->view((int) $o['household_id']);
+    }
+
+    /**
+     * Changes the package, cash or loan, installer, inverter or generator answer, up to the moment the
+     * family accepts a quote. After the installer has acted, the change goes out as a fresh request
+     * (the old survey date and quote are dropped). A cancelled sign-up restarts this way too.
+     */
+    public function change(?int $householdId, array $in): array
+    {
+        $o = $this->row($this->requireHousehold($householdId));
+        if (!in_array($o['status'], self::CHANGEABLE, true)) {
+            throw new HttpException(409, $o['status'] === 'certified'
+                ? 'Your home is already live. Contact support to change your system.'
+                : 'Your quote is accepted and your install is being booked, so your choices are locked. Contact your installer or support to change them.');
+        }
+        $set = [];
+        $notes = [];
+        if ($o['path'] === 'need') {
+            if (isset($in['package_id']) && (int) $in['package_id'] !== (int) $o['package_id']) {
+                $package = $this->catalog->find((int) $in['package_id']);
+                $set += ['package_id' => $package['id'], 'installer_id' => $package['installer_id']];
+                $notes[] = "Changed to {$package['name']} from {$package['installer']['name']}";
+            }
+            if (isset($in['payment']) && $in['payment'] !== $o['payment']) {
+                if (!in_array($in['payment'], ['cash', 'loan'], true)) {
+                    throw new HttpException(422, 'Choose how you want to pay: cash or an Access loan.', ['payment']);
+                }
+                $set['payment'] = $in['payment'];
+                $notes[] = $in['payment'] === 'loan' ? 'Switched to an Access loan' : 'Switched to paying cash';
+            }
+        } else {
+            if (isset($in['installer_id']) && (int) $in['installer_id'] !== (int) $o['installer_id']) {
+                $installer = $this->catalog->installerById((int) $in['installer_id']);
+                $set['installer_id'] = $installer['id'];
+                $notes[] = "Changed installer to {$installer['name']}";
+            }
+            $answers = array_intersect_key($in, array_flip(['inverter_brand', 'inverter_serial', 'generator']));
+            if ($answers) {
+                $before = $o;
+                Database::run("UPDATE onboardings SET status = 'started' WHERE id = ?", [$o['id']]); // answer() only edits open sign-ups
+                try {
+                    $this->answer($householdId, $answers);
+                } finally {
+                    Database::run('UPDATE onboardings SET status = ? WHERE id = ?', [$before['status'], $o['id']]);
+                }
+                $notes[] = 'Updated inverter or generator details';
+            }
+        }
+        if (!$notes && $o['status'] === 'cancelled') {
+            $notes[] = 'Restarted the request';
+        }
+        if (!$notes) {
+            throw new HttpException(422, 'Nothing changed. Pick a different option to change it.');
+        }
+        $o = $this->row((int) $o['household_id']);
+        $fresh = $o['status'] !== 'started';
+        if ($fresh) {
+            $ready = $o['path'] === 'need'
+                ? !(($set['payment'] ?? $o['payment']) === 'loan' && !$o['income_band'])
+                : $o['inverter_serial'] && $o['generator'] && ($set['installer_id'] ?? $o['installer_id']);
+            $set += ['status' => $ready ? 'requested' : 'started', 'quote_kobo' => null, 'survey_on' => null];
+        }
+        // The note goes in as its own event; a request sent again also records its new status.
+        $resent = ($set['status'] ?? 'started') !== 'started';
+        $this->move($o, $resent ? [] : $set, 'changed', implode('. ', $notes));
+        if ($resent) {
+            $this->move($this->row((int) $o['household_id']), $set, $set['status']);
+        }
+        return $this->view((int) $o['household_id']);
+    }
+
+    /** Cancels the request. The account stays; choosing again restarts it. */
+    public function cancel(?int $householdId): array
+    {
+        $o = $this->row($this->requireHousehold($householdId));
+        if ($o['status'] === 'cancelled') {
+            return $this->view((int) $o['household_id']);
+        }
+        if (!in_array($o['status'], self::CHANGEABLE, true)) {
+            throw new HttpException(409, 'Your quote is already accepted. Contact your installer or support to cancel.');
+        }
+        $this->move($o, ['status' => 'cancelled', 'quote_kobo' => null, 'survey_on' => null], 'cancelled', 'Cancelled by the family');
+        return $this->view((int) $o['household_id']);
+    }
+
     // ----- The installer's side -----
 
     public function requests(array $user): array
@@ -402,10 +517,10 @@ final class OnboardingService
         $events = jdec($o['events']) ?: [];
         $at = [];
         foreach ($events as $e) {
-            $at[$e['status']] ??= $e['at'];
+            $at[$e['status']] = $e['at']; // the latest: a changed request is dated when it was sent again
         }
         $order = self::ORDER[$o['path']];
-        $index = array_search($o['status'], $order, true);
+        $index = $o['status'] === 'cancelled' ? 0 : array_search($o['status'], $order, true);
         $loan = $o['payment'] === 'loan' || $o['loan_status'];
         $labels = $o['path'] === 'need'
             ? ['started' => 'Account created', 'requested' => 'Request sent', 'accepted' => 'Installer accepted', 'survey' => 'Survey booked',
@@ -420,6 +535,11 @@ final class OnboardingService
             array_splice($steps, 1, 0, [['key' => 'linked', 'label' => 'Inverter linked', 'done' => (bool) $linked, 'current' => !$linked, 'at' => $at['linked'] ?? null]]);
             if (!$linked) {
                 $steps[2]['current'] = false;
+            }
+        }
+        if ($o['status'] === 'cancelled') {
+            foreach ($steps as $i => $step) {
+                $steps[$i]['current'] = false;
             }
         }
         return [
@@ -437,8 +557,9 @@ final class OnboardingService
             'generator' => $o['generator'],
             'steps' => $steps,
             'next' => $this->next($o, $installer),
+            'can_change' => in_array($o['status'], self::CHANGEABLE, true),
             'estimate' => $package['estimate'] ?? Catalog::estimate(1.6),
-            'events' => array_map(fn ($e) => $e + ['label' => ($labels + ['linked' => 'Inverter linked'])[$e['status']] ?? $e['status']], $events),
+            'events' => array_map(fn ($e) => $e + ['label' => ($labels + ['linked' => 'Inverter linked', 'cancelled' => 'Cancelled', 'changed' => 'Changed choices'])[$e['status']] ?? $e['status']], $events),
         ];
     }
 
@@ -463,6 +584,8 @@ final class OnboardingService
             'approved' => ['by' => 'installer', 'action' => null, 'text' => "$who will install your system, take your generator as a trade-in and pair your inverter."],
             'visit' => ['by' => 'installer', 'action' => null, 'text' => "$who visits on $day to check your inverter and generator."],
             'certified' => ['by' => null, 'action' => null, 'text' => 'Your home is live on KlimateX.'],
+            'cancelled' => ['by' => 'family', 'action' => 'restart', 'text' => $o['path'] === 'need'
+                ? 'You cancelled your request. Choose a package to start again.' : 'You cancelled your request. Pick an installer to start again.'],
             default => ['by' => null, 'action' => null, 'text' => ''],
         };
     }

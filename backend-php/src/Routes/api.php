@@ -88,6 +88,9 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/api/onboarding/mine/answers', [OnboardingController::class, 'answer', ['household']]);
     $r->addRoute('POST', '/api/onboarding/mine/submit', [OnboardingController::class, 'submit', ['household']]);
     $r->addRoute('POST', '/api/onboarding/mine/accept-quote', [OnboardingController::class, 'acceptQuote', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/profile', [OnboardingController::class, 'profile', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/change', [OnboardingController::class, 'change', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/cancel', [OnboardingController::class, 'cancel', ['household']]);
     $r->addRoute('GET', '/api/onboarding/requests', [OnboardingController::class, 'requests', ['installer', 'admin']]);
     $r->addRoute('POST', '/api/onboarding/requests/{id:\d+}/{action:accept|survey|quote|complete|verify}', [OnboardingController::class, 'act', ['installer', 'admin']]);
 

@@ -83,3 +83,32 @@ dialog::backdrop {
 @media (prefers-reduced-motion: reduce) {
   .kx-msg-in, .kx-dot { animation: none; }
 }
+
+/* Family sign-up and tracker: each screen settles in; the sun turns slowly; the old generator drifts off.
+   Everything is still for people who ask for less motion. */
+@keyframes kx-step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kx-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes kx-drift-away {
+  0%, 15% { transform: translateX(0); opacity: 0.85; }
+  85%, 100% { transform: translateX(-14px); opacity: 0.35; }
+}
+@keyframes kx-flow {
+  to { stroke-dashoffset: -16; }
+}
+@keyframes kx-ring {
+  0% { box-shadow: 0 0 0 0 rgb(134 217 43 / 0.55); }
+  70%, 100% { box-shadow: 0 0 0 8px rgb(134 217 43 / 0); }
+}
+.kx-step-in { animation: kx-step-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.kx-spin-slow { animation: kx-spin 40s linear infinite; transform-box: fill-box; transform-origin: center; }
+.kx-drift-away { animation: kx-drift-away 5s ease-in-out infinite alternate; transform-box: fill-box; }
+.kx-flow { animation: kx-flow 1.2s linear infinite; }
+.kx-ring { animation: kx-ring 2.2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-step-in, .kx-spin-slow, .kx-drift-away, .kx-flow, .kx-ring { animation: none; }
+}

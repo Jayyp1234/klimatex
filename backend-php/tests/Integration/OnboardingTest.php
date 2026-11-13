@@ -156,6 +156,83 @@ final class OnboardingTest extends ApiTestCase
         $this->assertSame(404, $this->call('GET', '/api/onboarding/mine', null, 'household')->status, 'seeded homes have no sign-up to track');
     }
 
+    public function testAFamilyCanChangeTheirMindUntilTheQuoteIsAccepted(): void
+    {
+        $installers = $this->catalog()['installers'];
+        [$arewa, $yaba] = [$installers[0]['packages'][0], $installers[1]['packages'][0]];
+        $token = $this->signUp('0814 555 0105', ['path' => 'need', 'package_id' => $arewa['id'], 'payment' => 'cash'])['access_token'];
+        $this->as($token, 'POST', '/api/onboarding/mine/submit');
+        $id = $this->call('GET', '/api/onboarding/requests', null, 'installer')->body['data']['requests'][0]['id'];
+        foreach (['accept' => [], 'survey' => [], 'quote' => ['amount_naira' => 1500000]] as $action => $body) {
+            $this->call('POST', "/api/onboarding/requests/$id/$action", $body, 'installer');
+        }
+        $this->assertTrue($this->as($token, 'GET', '/api/onboarding/mine')->body['data']['can_change']);
+
+        // A different package from another installer: a fresh request, quote dropped.
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/change', ['package_id' => $yaba['id']])->body['data'];
+        $this->assertSame('requested', $view['status']);
+        $this->assertNull($view['quote_naira']);
+        $this->assertSame('Yaba Solar Works', $view['installer']['name']);
+        $this->assertStringContainsString('Changed to Home 3 kVA', array_column($view['events'], 'note', 'status')['changed']);
+        $this->assertCount(0, $this->call('GET', '/api/onboarding/requests', null, 'installer')->body['data']['requests'], 'Arewa no longer has it');
+        $this->assertSame(422, $this->as($token, 'POST', '/api/onboarding/mine/change', ['package_id' => $yaba['id']])->status, 'nothing changed');
+
+        // Switching to a loan brings the pre-check back first.
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/change', ['payment' => 'loan'])->body['data'];
+        $this->assertSame('loan_check', $view['next']['action']);
+
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/profile', ['name' => 'Chioma Eze', 'area' => 'Ikeja'])->body['data'];
+        $this->assertSame('Ikeja', $view['area']);
+        $this->assertSame('Chioma Eze', Database::val('SELECT name FROM households WHERE phone = ?', ['+2348145550105']));
+
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/cancel')->body['data'];
+        $this->assertSame('cancelled', $view['status']);
+        $this->assertSame('restart', $view['next']['action']);
+        $this->assertSame(409, $this->call('POST', "/api/onboarding/requests/$id/accept", [], 'admin')->status, 'installers cannot act on a cancelled request');
+        $this->as($token, 'POST', '/api/onboarding/mine/answers', ['income_band' => 'high']); // refused: not open
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/change', ['payment' => 'cash'])->body['data'];
+        $this->assertSame('requested', $view['status'], 'choosing again restarts it');
+
+        // Once the quote is accepted, choices lock; the name can still change.
+        $this->call('POST', "/api/onboarding/requests/$id/accept", [], 'admin');
+        $this->call('POST', "/api/onboarding/requests/$id/survey", [], 'admin');
+        $this->call('POST', "/api/onboarding/requests/$id/quote", ['amount_naira' => 2800000], 'admin');
+        $this->as($token, 'POST', '/api/onboarding/mine/accept-quote');
+        $this->assertFalse($this->as($token, 'GET', '/api/onboarding/mine')->body['data']['can_change']);
+        $this->assertSame(409, $this->as($token, 'POST', '/api/onboarding/mine/change', ['package_id' => $arewa['id']])->status);
+        $this->assertSame(409, $this->as($token, 'POST', '/api/onboarding/mine/cancel')->status);
+        $this->assertSame(200, $this->as($token, 'POST', '/api/onboarding/mine/profile', ['name' => 'Chioma Okafor-Eze'])->status);
+    }
+
+    public function testAFamilyWithSolarCanSwitchInstallerAndGeneratorAnswer(): void
+    {
+        $token = $this->signUp('0815 555 0106', ['path' => 'have'])['access_token'];
+        $this->as($token, 'POST', '/api/onboarding/mine/answers', ['inverter_brand' => 'Deye', 'inverter_serial' => 'SUN8KSG04LP3']);
+        $this->as($token, 'POST', '/api/onboarding/mine/answers', ['generator' => 'backup']);
+        $installers = $this->catalog()['installers'];
+        $this->as($token, 'POST', '/api/onboarding/mine/submit', ['installer_id' => $installers[0]['id']]);
+        $id = $this->call('GET', '/api/onboarding/requests', null, 'installer')->body['data']['requests'][0]['id'];
+        $this->call('POST', "/api/onboarding/requests/$id/accept", [], 'installer');
+
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/change', ['generator' => 'trade_in'])->body['data'];
+        $this->assertSame('trade_in', $view['generator']);
+        $this->assertSame('requested', $view['status'], 'the visit is booked again');
+        $view = $this->as($token, 'POST', '/api/onboarding/mine/change', ['installer_id' => $installers[2]['id']])->body['data'];
+        $this->assertSame('Ikeja PowerHome', $view['installer']['name']);
+        $this->assertSame(409, $this->as($token, 'POST', '/api/onboarding/mine/change', ['inverter_serial' => 'INV-SIM-0003'])->status, 'still one inverter per home');
+    }
+
+    public function testTheAssistantHelpsAFamilyThatIsStillSigningUp(): void
+    {
+        $package = $this->catalog()['installers'][0]['packages'][0];
+        $token = $this->signUp('0816 555 0107', ['path' => 'need', 'package_id' => $package['id'], 'payment' => 'loan'])['access_token'];
+        $r = $this->as($token, 'POST', '/api/assistant/ask', ['message' => 'How does the loan work?', 'lang' => 'en']);
+        $this->assertSame(200, $r->status, jenc($r->body));
+        $this->assertStringContainsString('Access', $r->body['data']['answer']);
+        $r = $this->as($token, 'POST', '/api/assistant/ask', ['message' => 'What should I do now?', 'lang' => 'en']);
+        $this->assertStringContainsString('loan check', $r->body['data']['answer']);
+    }
+
     // ----- Telegram -----
 
     private function bot(): void
@@ -230,7 +307,7 @@ final class OnboardingTest extends ApiTestCase
         $tracker = $this->tap('o:send');
         $this->assertStringContainsString('Request sent', $tracker['text']);
         $this->assertStringContainsString('unlock when your home is certified', $tracker['text']);
-        $this->assertStringContainsString('Your KlimateX progress', $this->say('How much have I been paid?')['text'], 'questions wait until the home is live');
+        $this->assertStringContainsString('audited period', $this->say('How do families get paid?')['text'], 'the AI answers while they wait');
 
         // The installer acts on the website; the family hears about each step in the chat.
         $id = (int) Database::val("SELECT id FROM onboardings WHERE channel = 'telegram'");
@@ -263,6 +340,38 @@ final class OnboardingTest extends ApiTestCase
         $installers = self::buttons($this->tap('o:gen:trade_in', 778));
         $this->assertCount(4, $installers);
         $this->assertStringContainsString('Visit requested', $this->tap($installers[2], 778)['text']);
+    }
+
+    public function testAFamilyChangesItsMindInTelegram(): void
+    {
+        $this->bot();
+        $list = $this->tap('o:need', 780);
+        $package = (int) substr(self::buttons($list)[0], 6);
+        $this->tap("o:pkg:$package", 780);
+        $this->tap('o:pay:cash', 780);
+        $this->hook(['message' => ['message_id' => 6, 'from' => ['id' => 780], 'chat' => ['id' => 780, 'type' => 'private'],
+            'contact' => ['phone_number' => '+2348175550108', 'user_id' => 780]]]);
+        $this->say('Bisi Ade', 780);
+        $this->tap('o:area:Yaba', 780);
+        $this->tap('o:send', 780);
+
+        $menu = self::buttons($this->tap('o:chg', 780));
+        $this->assertSame(['o:cpkl', 'o:cpay:loan', 'o:prof', 'o:cxl', 'o:track'], $menu);
+        $choices = self::buttons($this->tap('o:cpkl', 780));
+        $this->assertStringStartsWith('o:cpk:', $choices[0]);
+        $this->tap($choices[4], 780);
+        $this->assertStringContainsString('Request sent', $this->last()['text']);
+        $this->assertSame('Ikeja PowerHome', Database::val('SELECT i.name FROM onboardings o JOIN installers i ON i.id = o.installer_id WHERE o.channel = ?', ['telegram']));
+
+        $this->tap('o:prof', 780);
+        $this->say('Bisi Adeyemi', 780);
+        $this->assertSame('Bisi Adeyemi', Database::val("SELECT name FROM households WHERE phone = '+2348175550108'"));
+
+        $this->tap('o:cxl', 780);
+        $cancelled = $this->tap('o:cxly', 780);
+        $this->assertStringStartsWith('o:cpk:', self::buttons($cancelled)[0], 'offers the packages to start again');
+        $this->assertContains('o:go', self::buttons($this->tap('o:track', 780)), 'and the tracker has Start again');
+        $this->assertStringStartsWith('o:cpk:', self::buttons($this->tap('o:go', 780))[0]);
     }
 
     public function testANumberWithAnAccountIsAskedForItsPin(): void

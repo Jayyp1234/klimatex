@@ -108,6 +108,10 @@ API:
 | `POST /api/onboarding/mine/answers` | household | `income_band`, `inverter_brand`, `inverter_serial`, `generator` |
 | `POST /api/onboarding/mine/submit` | household | Send the request (path B names the installer) |
 | `POST /api/onboarding/mine/accept-quote` | household | Accept; with a loan, Access is asked now (sandbox caps at ₦1,000,000) |
+| `POST /api/onboarding/mine/profile` | household | Change name or area, any time |
+| `POST /api/onboarding/mine/change` | household | A change of heart: package or cash/loan (path A), installer, inverter or generator (path B). Allowed until the quote is accepted; after the installer has acted it goes out as a fresh request and any quote is dropped. Also restarts a cancelled sign-up |
+| `POST /api/onboarding/mine/cancel` | household | Cancel the request; the account stays |
+| `POST /api/assistant/ask` | household | The KlimateX AI also answers families still signing up, from their progress, the packages, the loan pre-check and how KlimateX works (read-only tools in `Services/Ai/OnboardingTools.php`) |
 | `GET /api/onboarding/requests` | installer, admin | Requests to act on |
 | `POST /api/onboarding/requests/{id}/{accept\|survey\|quote\|complete\|verify}` | installer, admin | Move a request on; `complete`/`verify` certify the home |
 

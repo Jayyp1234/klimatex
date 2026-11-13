@@ -2,6 +2,8 @@
 export const links = {
   app: "/app/",
   signIn: "/app/",
+  /** Families start here: find solar or link the solar they have, then create an account. */
+  getStarted: "/get-started/",
   /** Companies, installers, auditors and lenders: opens the work-email sign-in. Families use signIn (phone). */
   workSignIn: "/app/?as=work",
   requestDemo: "/app/?as=work",

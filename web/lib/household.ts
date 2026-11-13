@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { ApiError, api } from "./api";
 
 /** The household app's view of the API. Pages and components read only these types. */
 
@@ -61,7 +61,8 @@ export type Payout = {
 
 export type Alert = { id: string; kind: "no_data" | "low_output" | "held" | "payout"; severity: "critical" | "warning" | "info"; at: string | null; title: string; body: string };
 
-export type Dashboard = { home: Home; certificate: Certificate | null; payouts: Payout[]; paidNaira: number; alerts: Alert[]; dataAsOf: string | null };
+/** certificateNote: why there is no certificate yet (a new home has readings but no audit), in the server's words. */
+export type Dashboard = { home: Home; certificate: Certificate | null; certificateNote: string | null; payouts: Payout[]; paidNaira: number; alerts: Alert[]; dataAsOf: string | null };
 
 export const LANGUAGES = [
   { code: "en", label: "English" },
@@ -90,9 +91,9 @@ type ApiPayout = Omit<Payout, "amountNaira" | "paidOn"> & { amount_naira: number
 
 export async function loadDashboard(): Promise<Dashboard> {
   const { site_id: id } = await api<{ site_id: number }>("/api/homes/mine");
-  const [home, certificate, payouts, alerts] = await Promise.all([
+  const [home, certificateOrNote, payouts, alerts] = await Promise.all([
     api<ApiHome>(`/api/homes/${id}`),
-    api<Certificate>(`/api/homes/${id}/certificate`).catch(() => null),
+    api<Certificate>(`/api/homes/${id}/certificate`).catch((e: unknown) => (e instanceof ApiError && e.status === 409 ? e.message : null)),
     api<{ payouts: ApiPayout[]; paid_naira: number }>(`/api/homes/${id}/payouts`),
     api<{ alerts: Alert[]; data_as_of: string | null }>(`/api/homes/${id}/alerts`),
   ]);
@@ -130,7 +131,8 @@ export async function loadDashboard(): Promise<Dashboard> {
       checks: latest?.checks ?? [],
       months,
     },
-    certificate,
+    certificate: typeof certificateOrNote === "string" ? null : certificateOrNote,
+    certificateNote: typeof certificateOrNote === "string" ? certificateOrNote : null,
     payouts: payouts.payouts.map(({ amount_naira, paid_on, ...p }) => ({ ...p, amountNaira: amount_naira, paidOn: paid_on })),
     paidNaira: payouts.paid_naira,
     alerts: alerts.alerts,

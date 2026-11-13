@@ -12,7 +12,7 @@ export type User = {
   installer_id: number | null;
 };
 
-type Session = { access_token: string; refresh_token: string; user: User };
+export type Session = { access_token: string; refresh_token: string; user: User };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -31,7 +31,8 @@ export function getSession(): Session | null {
   }
 }
 
-function saveSession(session: Session | null) {
+/** Keeps a session the server issued, so the person is signed in. Also used by sign-up, which returns the same shape. */
+export function saveSession(session: Session | null) {
   try {
     if (session) sessionStorage.setItem(KEY, JSON.stringify(session));
     else sessionStorage.removeItem(KEY);
@@ -116,7 +117,8 @@ export async function signOut(): Promise<void> {
 export type PhoneStart = { next: "pin" | "code"; phone: string; expires_in?: number; demo_code?: string };
 export type PhoneVerified = { setup_token: string; name: string; returning: boolean };
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+/** A public call: no token, and no refresh on a 401 (a wrong code is a 401 too). */
+export async function post<T>(path: string, body: unknown): Promise<T> {
   const result = await send<T>(path, "POST", body);
   if (result.status !== 200) throw new ApiError(result.status, result.message);
   return result.data;

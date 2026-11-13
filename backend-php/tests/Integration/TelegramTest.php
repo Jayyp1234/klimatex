@@ -83,7 +83,8 @@ final class TelegramTest extends ApiTestCase
         $this->text('/stop');
         $this->assertSame(0, (int) Database::val('SELECT COUNT(*) FROM telegram_links'));
         $this->text('How much have I been paid?');
-        $this->assertStringContainsString('Connect Telegram', $this->lastReply()['text'], 'an unlinked chat sees nothing about the home');
+        $this->assertStringContainsString('Welcome to KlimateX', $this->lastReply()['text'], 'an unlinked chat gets the sign-up welcome');
+        $this->assertStringNotContainsString('₦', $this->lastReply()['text'], 'and sees nothing about the home');
     }
 
     public function testCodesWorkOnceAndOnlyWithTheSecret(): void
@@ -168,7 +169,8 @@ final class TelegramTest extends ApiTestCase
     public function testTheWelcomeOffersSignIn(): void
     {
         $this->text('hello', 603);
-        $this->assertSame('login', $this->lastReply()['reply_markup']['inline_keyboard'][0][0]['callback_data']);
+        $buttons = array_column(array_merge(...$this->lastReply()['reply_markup']['inline_keyboard']), 'callback_data');
+        $this->assertSame(['o:start', 'o:what', 'login'], $buttons, 'get started, learn more, or sign in');
     }
 
     private function button(string $data, int $chat = 555): void

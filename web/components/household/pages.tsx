@@ -119,7 +119,7 @@ export function OverviewPage() {
     <>
       <PageHeader
         title={`Welcome back, ${user.name}`}
-        description={`${homeCode(home.siteId)} · ${home.area}, Lagos · Latest reading ${longDate(data.dataAsOf)}${firstDay ? ` · audited period ${periodLabel({ start: firstDay, end: data.dataAsOf ?? firstDay })}` : ""}`}
+        description={`${homeCode(home.siteId)} · ${home.area}, Lagos · Latest reading ${longDate(data.dataAsOf)}${firstDay && home.status ? ` · audited period ${periodLabel({ start: firstDay, end: data.dataAsOf ?? firstDay })}` : ""}`}
       />
 
       <section className="relative overflow-hidden rounded-2xl bg-forest px-6 py-5 text-white">
@@ -130,7 +130,7 @@ export function OverviewPage() {
             {!certificate ? (
               <>
                 <p className="text-[19px] font-semibold tracking-tight">Keep your home running on clean energy</p>
-                <p className="text-sm text-white/75">Your grade, savings and payouts appear after your first audited period.</p>
+                <p className="text-sm text-white/75">{data.certificateNote ?? "Your grade, savings and payouts appear after your first audited period."}</p>
               </>
             ) : canImprove ? (
               <>
@@ -474,7 +474,7 @@ export function CertificatePage() {
     return (
       <>
         <PageHeader title="Home Energy Certificate" />
-        <Panel><p className="py-8 text-center text-sm text-body">Your certificate appears after your first audited period.</p></Panel>
+        <Panel><p className="py-8 text-center text-sm text-body">{data.certificateNote ?? "Your certificate appears after your first audited period."}</p></Panel>
       </>
     );
   }

@@ -7,6 +7,7 @@ use App\Controllers\AuthController;
 use App\Controllers\FleetController;
 use App\Controllers\HomeController;
 use App\Controllers\MarketController;
+use App\Controllers\OnboardingController;
 use App\Controllers\PublicController;
 use App\Controllers\StreetController;
 use App\Controllers\TelegramController;
@@ -78,6 +79,17 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/api/orders/{id:\d+}/simulate-payment', [MarketController::class, 'simulatePayment', ['buyer']]);
     $r->addRoute('GET', '/api/market/overview', [MarketController::class, 'overview', ['buyer']]);
     $r->addRoute('GET', '/api/market/orders', [MarketController::class, 'orders', ['buyer']]);
+
+    // Family self-onboarding and the installer marketplace (docs/ONBOARDING_FLOW.md)
+    $r->addRoute('GET', '/api/onboarding/installers', [OnboardingController::class, 'installers', null]);
+    $r->addRoute('POST', '/api/onboarding/phone', [OnboardingController::class, 'phone', null]);
+    $r->addRoute('POST', '/api/onboarding/account', [OnboardingController::class, 'account', null]);
+    $r->addRoute('GET', '/api/onboarding/mine', [OnboardingController::class, 'mine', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/answers', [OnboardingController::class, 'answer', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/submit', [OnboardingController::class, 'submit', ['household']]);
+    $r->addRoute('POST', '/api/onboarding/mine/accept-quote', [OnboardingController::class, 'acceptQuote', ['household']]);
+    $r->addRoute('GET', '/api/onboarding/requests', [OnboardingController::class, 'requests', ['installer', 'admin']]);
+    $r->addRoute('POST', '/api/onboarding/requests/{id:\d+}/{action:accept|survey|quote|complete|verify}', [OnboardingController::class, 'act', ['installer', 'admin']]);
 
     $r->addRoute('POST', '/api/assistant/ask', [AssistantController::class, 'ask', ['household']]);
 

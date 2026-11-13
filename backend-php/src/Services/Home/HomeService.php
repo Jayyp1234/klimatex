@@ -67,7 +67,7 @@ final class HomeService
     public function certificate(int $id): array
     {
         $site = $this->site($id);
-        $result = $this->results->latestForSite($id) ?? throw new HttpException(409, 'No period has been computed yet.');
+        $result = $this->results->latestForSite($id) ?? throw new HttpException(409, 'Your first grade comes after your first monthly audit. Your readings are already coming in.');
         $monthly = jdec($result['monthly']);
         $months = max(1, count($monthly));
         $before = Grade::beforeShare((float) $site['grid_hours_per_day']);

@@ -15,7 +15,7 @@ export const workspaces: Record<Role, Workspace> = {
     title: "Installer",
     summary: "Every home you fitted: its solar, audit status and your earnings.",
     icon: Wrench,
-    nav: ["Overview", "Energy", "Attention", "Homes"],
+    nav: ["Requests", "Overview", "Energy", "Attention", "Homes"],
   },
   auditor: {
     title: "Auditor portal",
@@ -39,7 +39,7 @@ export const workspaces: Record<Role, Workspace> = {
     title: "Operations console",
     summary: "Every home, payout and solar loan in one view.",
     icon: LayoutDashboard,
-    nav: ["Portfolio", "Grades", "Solar loans", "Homes"],
+    nav: ["Requests", "Portfolio", "Grades", "Solar loans", "Homes"],
   },
 };
 

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
@@ -29,10 +29,12 @@ import {
   WifiOff,
 } from "lucide-react";
 import { VerifyDialog } from "@/components/VerifyCredit";
-import { api, getSession, signOut, type User as SessionUser } from "@/lib/api";
+import { Tracker } from "@/components/onboarding/Tracker";
+import { ApiError, api, getSession, signOut, type User as SessionUser } from "@/lib/api";
 import { formatPhone } from "@/lib/payout";
 import { homeCode, loadDashboard, shortDate, type Alert, type Dashboard, type Payout } from "@/lib/household";
 import { initialsOf } from "@/lib/marketplace";
+import { loadMine, type OnboardingView } from "@/lib/onboarding";
 import { homeFor } from "@/lib/workspaces";
 import { HeldDialog, PayoutDialog } from "./Dialogs";
 
@@ -257,6 +259,7 @@ export function HouseholdShell({ children }: { children: ReactNode }) {
   const path = (usePathname() ?? BASE).replace(/\/?$/, "/");
   const [user, setUser] = useState<SessionUser | null>(null);
   const [data, setData] = useState<Dashboard | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingView | null>(null);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -294,14 +297,43 @@ export function HouseholdShell({ children }: { children: ReactNode }) {
       .then((next) => {
         if (!stale) {
           setData(next);
+          setOnboarding(null);
           setError("");
         }
       })
-      .catch((e) => !stale && setError(e instanceof Error ? e.message : "Your home couldn't be loaded."));
+      .catch(async (e) => {
+        // No home yet: a family that signed up itself sees its step tracker until the home is certified.
+        if (e instanceof ApiError && e.status === 404) {
+          const mine = await loadMine().catch(() => null);
+          if (stale) return;
+          if (mine && !mine.certified) {
+            setOnboarding(mine);
+            setError("");
+            return;
+          }
+        }
+        if (!stale) setError(e instanceof Error ? e.message : "Your home couldn't be loaded.");
+      });
     return () => {
       stale = true;
     };
   }, [user, version]);
+
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+  if (user && onboarding) {
+    return (
+      <Tracker
+        user={user}
+        initial={onboarding}
+        onCertified={reload}
+        onSignOut={async () => {
+          await signOut();
+          window.location.replace("/app/");
+        }}
+      />
+    );
+  }
 
   if (!user || (!data && !error)) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-muted">Loading your home…</div>;

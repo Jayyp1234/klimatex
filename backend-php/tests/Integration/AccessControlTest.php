@@ -25,9 +25,10 @@ final class AccessControlTest extends ApiTestCase
         (require dirname(__DIR__, 2) . '/src/Routes/api.php')($collector);
         sort($collector->public);
         $this->assertSame([
-            'GET /api/credits', 'GET /api/ledger/verify', 'GET /api/streets', 'GET /api/verify/{serial:[A-Za-z0-9\-]+}', 'GET /healthz',
+            'GET /api/credits', 'GET /api/ledger/verify', 'GET /api/onboarding/installers', 'GET /api/streets', 'GET /api/verify/{serial:[A-Za-z0-9\-]+}', 'GET /healthz',
             'POST /api/auth/login', 'POST /api/auth/logout', 'POST /api/auth/phone/complete', 'POST /api/auth/phone/login',
-            'POST /api/auth/phone/start', 'POST /api/auth/phone/verify', 'POST /api/auth/refresh', 'POST /api/telegram/webhook', 'POST /hooks/forge',
+            'POST /api/auth/phone/start', 'POST /api/auth/phone/verify', 'POST /api/auth/refresh',
+            'POST /api/onboarding/account', 'POST /api/onboarding/phone', 'POST /api/telegram/webhook', 'POST /hooks/forge',
         ], $collector->public);
     }
 

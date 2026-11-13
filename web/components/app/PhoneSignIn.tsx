@@ -19,7 +19,7 @@ const RESEND_SECONDS = 30;
 
 /** Mirrors the server's rule so a weak PIN is caught before the family types it twice. */
 const RUNS = "0123456789";
-const weakPin = (pin: string) =>
+export const weakPin = (pin: string) =>
   new Set(pin).size === 1 || RUNS.includes(pin) || [...RUNS].reverse().join("").includes(pin) || ["1212", "2580", "1004", "2000", "2026"].includes(pin);
 
 const field =

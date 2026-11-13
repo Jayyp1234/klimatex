@@ -50,6 +50,7 @@ export function SiteHeader() {
 
         <div className="hidden items-center gap-5 lg:flex">
           <a href={links.signIn} className={navItem}>Sign in</a>
+          <a href={links.getStarted} className={navItem}>Get started</a>
           <a href={links.requestDemo} className="rounded-lg bg-forest px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-forest-hover">
             Request a demo
           </a>
@@ -74,6 +75,7 @@ export function SiteHeader() {
             { label: "Methodology", href: "#platform" },
             { label: "Resources", href: "#resources" },
             { label: "Sign in", href: links.signIn },
+            { label: "Get started", href: links.getStarted },
           ].map((item) => (
             <a key={item.label} href={item.href} onClick={close} className="block border-b border-line py-3 text-[15px] font-medium">
               {item.label}

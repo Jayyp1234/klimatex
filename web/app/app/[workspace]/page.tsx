@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/app/AppShell";
 import { AuditorPortal } from "@/components/workspace/AuditorPortal";
 import { FleetDashboard } from "@/components/workspace/FleetDashboard";
+import { OnboardingRequests } from "@/components/workspace/OnboardingRequests";
 import type { Role } from "@/lib/api";
 import { roles, workspaces } from "@/lib/workspaces";
 
@@ -22,7 +23,12 @@ export default async function WorkspacePage({ params }: PageProps<"/app/[workspa
   const role = workspace as Role;
   return (
     <AppShell role={role}>
-      {role === "installer" || role === "lender" || role === "admin" ? (
+      {role === "installer" || role === "admin" ? (
+        <div className="space-y-5">
+          <OnboardingRequests admin={role === "admin"} />
+          <FleetDashboard variant={role} />
+        </div>
+      ) : role === "lender" ? (
         <FleetDashboard variant={role} />
       ) : role === "auditor" ? (
         <AuditorPortal />

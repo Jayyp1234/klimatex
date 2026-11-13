@@ -197,7 +197,9 @@ final class TelegramService
         $chatId = (string) $message['chat']['id'];
         $this->fromLang = $message['from']['language_code'] ?? null;
         if (isset($message['contact'])) {
-            $this->onContact($chatId, $message);
+            if (!$this->signup()->onContact($chatId, $message, $this->lang($chatId))) {
+                $this->onContact($chatId, $message);
+            }
             return;
         }
         if (isset($message['voice']) || isset($message['audio'])) {
@@ -230,6 +232,7 @@ final class TelegramService
         }
         if (preg_match('~^/cancel(?:@\w+)?$~', $text)) {
             $this->clearLogin($chatId);
+            BotOnboarding::clear($chatId);
             $this->reply($chatId, 'Cancelled.', $this->link($chatId), ['remove_keyboard' => true]);
             return;
         }
@@ -238,8 +241,15 @@ final class TelegramService
             return;
         }
         $link = $this->link($chatId);
+        if ($this->signup()->onText($chatId, $text, $this->lang($chatId), $link)) {
+            return;
+        }
         if (!$link) {
             $this->notLinked($chatId);
+            return;
+        }
+        if (BotOnboarding::pending((int) $link['household_id'])) {
+            $this->signup()->tracker($chatId, $link, null, BotOnboarding::t($link['lang'], 'pending_q'));
             return;
         }
         if (preg_match('~^/help(?:@\w+)?$~', $text)) {
@@ -252,12 +262,22 @@ final class TelegramService
     private function onButton(string $chatId, string $data): void
     {
         if ($data === 'login') {
+            BotOnboarding::clear($chatId);
             $this->startLogin($chatId);
             return;
         }
         $link = $this->link($chatId);
+        if (str_starts_with($data, 'o:')) {
+            $this->signup()->onButton($chatId, $data, $this->lang($chatId), $link);
+            return;
+        }
         if (!$link) {
             $this->notLinked($chatId);
+            return;
+        }
+        // Until the home is certified, the home buttons show the sign-up tracker instead.
+        if ($data !== 'langs' && !str_starts_with($data, 'lang:') && BotOnboarding::pending((int) $link['household_id'])) {
+            $this->signup()->tracker($chatId, $link);
             return;
         }
         if ($data === 'langs') {
@@ -369,7 +389,11 @@ final class TelegramService
     {
         if ($code === null) {
             $link = $this->link($chatId);
-            $link ? $this->reply($chatId, BotText::t($link['lang'], 'ready'), $link) : $this->notLinked($chatId);
+            match (true) {
+                !$link => $this->notLinked($chatId),
+                BotOnboarding::pending((int) $link['household_id']) => $this->signup()->tracker($chatId, $link),
+                default => $this->reply($chatId, BotText::t($link['lang'], 'ready'), $link),
+            };
             return;
         }
         $row = Database::tx(function () use ($code) {
@@ -451,8 +475,8 @@ final class TelegramService
                 : (new AuthService())->login($state['id'], $text, 'telegram');
         } catch (HttpException $e) {
             $tip = $state['kind'] === 'phone' ? ' Send your PIN again, or /cancel.' : ' Send your password again, or /cancel.';
-            $this->reply($chatId, $e->getMessage() . ($e->getCode() === 429 ? '' : $tip));
-            if ($e->getCode() === 429) {
+            $this->reply($chatId, $e->getMessage() . ($e->status === 429 ? '' : $tip));
+            if ($e->status === 429) {
                 $this->clearLogin($chatId);
             }
             return;
@@ -490,6 +514,10 @@ final class TelegramService
             $this->notLinked($chatId);
             return;
         }
+        if (BotOnboarding::pending((int) $link['household_id'])) {
+            $this->signup()->tracker($chatId, $link, null, BotOnboarding::t($link['lang'], 'pending_q'));
+            return;
+        }
         self::api('sendChatAction', ['chat_id' => $chatId, 'action' => 'typing']);
         $historyKey = "telegram:history:$chatId";
         $history = jdec(KvStore::get($historyKey) ?? '[]') ?: [];
@@ -504,10 +532,66 @@ final class TelegramService
         $this->reply($chatId, $answer, $link);
     }
 
+    /** A chat with no home: the sign-up welcome, with sign-in for families who already have an account. */
     private function notLinked(string $chatId): void
     {
-        $this->reply($chatId, 'Welcome to KlimateX. To connect your home, tap Sign in below (or send /login) and use the phone number and PIN, or email and password, you use in the KlimateX app. You can also tap Connect Telegram in the app.',
-            null, ['inline_keyboard' => [[['text' => 'Sign in', 'callback_data' => 'login']]]]);
+        $this->signup()->welcome($chatId, $this->lang($chatId));
+    }
+
+    private function signup(): BotOnboarding
+    {
+        return new BotOnboarding($this);
+    }
+
+    /** The chat's language: the linked home's choice, otherwise the sender's Telegram language. */
+    private function lang(string $chatId): string
+    {
+        return $this->link($chatId)['lang'] ?? BotText::lang($this->fromLang);
+    }
+
+    /** Sign-up found an existing account for this number: sign in with its PIN instead. */
+    public function awaitPin(string $chatId, string $phone, string $text): void
+    {
+        $this->saveLogin($chatId, ['step' => 'secret', 'kind' => 'phone', 'id' => $phone]);
+        $this->reply($chatId, $text, null, ['remove_keyboard' => true]);
+    }
+
+    /** Links this chat to a household created during sign-up. */
+    public function linkChat(string $chatId, int $userId, int $householdId, string $lang): array
+    {
+        Database::run('DELETE FROM telegram_links WHERE chat_id = ?', [$chatId]);
+        Database::insert('telegram_links', ['chat_id' => $chatId, 'user_id' => $userId, 'household_id' => $householdId,
+            'lang' => BotText::lang($lang), 'linked_at' => now_iso()], '');
+        return $this->link($chatId);
+    }
+
+    /**
+     * Tells every chat linked to a household what just happened in its sign-up (installer accepted,
+     * quote ready, loan approved, certified...). A failure is logged and never touches the sign-up.
+     */
+    public static function notifyOnboarding(int $householdId, string $status): void
+    {
+        if (!self::configured()) {
+            return;
+        }
+        try {
+            $chats = Database::all('SELECT chat_id, user_id, lang FROM telegram_links WHERE household_id = ?', [$householdId]);
+            if (!$chats) {
+                return;
+            }
+            $view = (new \App\Services\Onboarding\OnboardingService())->view($householdId);
+            foreach ($chats as $chat) {
+                $name = explode(' ', (new UserRepository())->find((int) $chat['user_id'])['name'] ?? '')[0];
+                $notice = BotOnboarding::notice($view, $status, $chat['lang'], $name);
+                if ($notice === null) {
+                    continue;
+                }
+                $markup = $notice['markup'] ?? (!empty($notice['certified']) ? self::menu($chat['lang']) : BotOnboarding::menu($chat['lang']));
+                self::api('sendMessage', ['chat_id' => $chat['chat_id'], 'text' => $notice['text'], 'reply_markup' => $markup]);
+            }
+        } catch (Throwable $e) {
+            error_log('telegram: onboarding notice failed: ' . get_class($e));
+        }
     }
 
     private function link(string $chatId): ?array
@@ -525,7 +609,7 @@ final class TelegramService
         if ($markup !== null && !($link && isset($markup['remove_keyboard']))) {
             $params['reply_markup'] = $markup;
         } elseif ($link) {
-            $params['reply_markup'] = self::menu($link['lang']);
+            $params['reply_markup'] = BotOnboarding::pending((int) $link['household_id']) ? BotOnboarding::menu($link['lang']) : self::menu($link['lang']);
         }
         self::api('sendMessage', $params);
     }

@@ -56,8 +56,11 @@ export default function HomePage() {
                 KlimateX measures what solar replaces, verifies the emissions avoided, issues carbon credits, and pays families through Access Bank.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
-                <a href={links.app} className="inline-flex items-center gap-2 rounded-lg bg-forest px-6 py-3.5 text-[15px] font-medium text-white shadow-sm transition-colors hover:bg-forest-hover">
-                  Try the demo <ArrowRight size={17} />
+                <a href={links.getStarted} className="inline-flex items-center gap-2 rounded-lg bg-forest px-6 py-3.5 text-[15px] font-medium text-white shadow-sm transition-colors hover:bg-forest-hover">
+                  Get started <ArrowRight size={17} />
+                </a>
+                <a href={links.app} className="rounded-lg border border-line bg-white px-6 py-3.5 text-[15px] font-medium shadow-sm transition-colors hover:bg-mint">
+                  Try the demo
                 </a>
                 <VerifyButton className="rounded-lg border border-line bg-white px-6 py-3.5 text-[15px] font-medium shadow-sm transition-colors hover:bg-mint">
                   Verify a credit

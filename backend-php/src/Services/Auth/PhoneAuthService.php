@@ -123,6 +123,44 @@ final class PhoneAuthService
         return $this->auth->issue($user);
     }
 
+    /**
+     * Sign-up step 1 for a family with no home on KlimateX yet. A number that already belongs to a
+     * home is sent to sign in instead; any other number gets a one-time code.
+     */
+    public function startSignup(string $input): array
+    {
+        $phone = self::normalise($input);
+        if ($this->households->findByPhone($phone)) {
+            return ['next' => 'signin', 'phone' => self::mask($phone)];
+        }
+        return ['next' => 'code'] + $this->sendCode($phone);
+    }
+
+    /**
+     * Spends a setup token from verify() and returns the phone it proved, for creating a new account.
+     * Call inside the transaction that creates the account, so a failure leaves the token unspent.
+     */
+    public function claimSetup(string $token): string
+    {
+        $row = $token === '' ? null : $this->codes->findBySetup(hash('sha256', $token));
+        $fresh = $row && $row['verified_at'] >= gmdate('Y-m-d\TH:i:s\Z', time() - Settings::SETUP_TTL_SECONDS);
+        if (!$fresh || !$this->codes->spendSetup((int) $row['id'])) {
+            throw new HttpException(401, 'This step has timed out. Start again with your phone number.');
+        }
+        return $row['phone'];
+    }
+
+    /** A PIN a family can sign in with: 4 digits, not a repeat or a run. */
+    public static function assertPin(string $pin): void
+    {
+        if (!preg_match('/^\d{4}$/', $pin)) {
+            throw new HttpException(422, 'Your PIN must be 4 digits.', ['pin']);
+        }
+        if (count(array_unique(str_split($pin))) === 1 || in_array($pin, self::WEAK_PINS, true)) {
+            throw new HttpException(422, 'That PIN is too easy to guess. Avoid repeats like 1111 and runs like 1234.', ['pin']);
+        }
+    }
+
     /** Everyday sign-in. Five wrong PINs lock the phone for 15 minutes; a code resets it. */
     public function login(string $input, string $pin, string $ip): array
     {
